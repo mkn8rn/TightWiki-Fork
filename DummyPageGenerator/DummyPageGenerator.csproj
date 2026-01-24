@@ -1,7 +1,7 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <OutputType>Exe</OutputType>
-    <TargetFramework>net9.0</TargetFramework>
+    <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
   </PropertyGroup>
@@ -30,15 +30,16 @@
   </ItemGroup>
 
   <ItemGroup>
-    <PackageReference Include="Autofac.Extensions.DependencyInjection" Version="10.0.0" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" Version="9.0.9" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.9" />
-    <PackageReference Include="NTDLS.DelegateThreadPooling" Version="2.0.0" />
+    <PackageReference Include="Autofac.Extensions.DependencyInjection" />
+    <PackageReference Include="Magick.NET-Q8-AnyCPU" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="NTDLS.DelegateThreadPooling" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\TightWiki.Engine.Implementation\TightWiki.Engine.Implementation.csproj" />
     <ProjectReference Include="..\TightWiki.Engine\TightWiki.Engine.csproj" />
+    <ProjectReference Include="..\TightWiki.Engine.Implementation\TightWiki.Engine.Implementation.csproj" />
     <ProjectReference Include="..\TightWiki.Models\TightWiki.Models.csproj" />
     <ProjectReference Include="..\TightWiki.Repository\TightWiki.Repository.csproj" />
   </ItemGroup>
