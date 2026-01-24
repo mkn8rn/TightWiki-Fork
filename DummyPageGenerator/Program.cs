@@ -12,6 +12,7 @@ using TightWiki.Engine;
 using TightWiki.Engine.Implementation;
 using TightWiki.Engine.Implementation.Handlers;
 using TightWiki.Engine.Library.Interfaces;
+using DAL;
 using TightWiki.Library;
 using TightWiki.Repository;
 
@@ -61,7 +62,7 @@ namespace DummyPageGenerator
 
             services.AddLogging(configure => configure.AddConsole());
 
-            services.AddDbContext<ApplicationDbContext>(options =>
+            services.AddDbContext<IdentityDbContext>(options =>
                 options.UseSqlite(configuration.GetConnectionString("UsersConnection")));
 
             ManagedDataStorage.Pages.SetConnectionString(configuration.GetConnectionString("PagesConnection"));
@@ -76,7 +77,7 @@ namespace DummyPageGenerator
 
             // Register Identity services
             services.AddIdentity<IdentityUser, IdentityRole>()
-                    .AddEntityFrameworkStores<ApplicationDbContext>()
+                    .AddEntityFrameworkStores<IdentityDbContext>()
                     .AddDefaultTokenProviders();
 
             var serviceProvider = services.BuildServiceProvider();

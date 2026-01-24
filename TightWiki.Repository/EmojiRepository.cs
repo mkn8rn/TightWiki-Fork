@@ -1,162 +1,269 @@
+using DAL;
+using DalEmoji = DAL.Models.Emoji;
+using DalEmojiCategory = DAL.Models.EmojiCategory;
+using Microsoft.EntityFrameworkCore;
 using TightWiki.Library;
 using TightWiki.Models;
-using TightWiki.Models.DataModels;
+using ApiEmoji = TightWiki.Models.DataModels.Emoji;
+using ApiEmojiCategory = TightWiki.Models.DataModels.EmojiCategory;
+using ApiUpsertEmoji = TightWiki.Models.DataModels.UpsertEmoji;
 
 namespace TightWiki.Repository
 {
+    public interface IEmojiRepository
+    {
+        List<ApiEmoji> GetAllEmojis();
+        IEnumerable<string> AutoCompleteEmoji(string term);
+        IEnumerable<ApiEmoji> GetEmojisByCategory(string category);
+        IEnumerable<ApiEmojiCategory> GetEmojiCategoriesGrouped();
+        IEnumerable<int> SearchEmojiCategoryIds(List<string> categories);
+        List<ApiEmojiCategory> GetEmojiCategoriesByName(string name);
+        void DeleteById(int id);
+        ApiEmoji? GetEmojiByName(string name);
+        int UpsertEmoji(ApiUpsertEmoji emoji);
+        List<ApiEmoji> GetAllEmojisPaged(int pageNumber, string? orderBy = null, string? orderByDirection = null, List<string>? categories = null);
+    }
+
     public static partial class EmojiRepository
     {
-        public static List<Emoji> GetAllEmojis()
-            => ManagedDataStorage.Emoji.Query<Emoji>("GetAllEmojis.sql").ToList();
+        private static IServiceProvider? _serviceProvider;
+        public static void UseServiceProvider(IServiceProvider serviceProvider) => _serviceProvider = serviceProvider;
 
-        public static IEnumerable<string> AutoCompleteEmoji(string term)
-            => ManagedDataStorage.Emoji.Query<string>("AutoCompleteEmoji.sql", new { Term = term });
+        private static IEmojiRepository Repo =>
+            _serviceProvider?.GetService(typeof(IEmojiRepository)) as IEmojiRepository
+            ?? throw new InvalidOperationException("IEmojiRepository is not configured.");
 
-        public static IEnumerable<Emoji> GetEmojisByCategory(string category)
-            => ManagedDataStorage.Emoji.Query<Emoji>("GetEmojisByCategory.sql", new { Category = category });
+        public static List<ApiEmoji> GetAllEmojis() => Repo.GetAllEmojis();
+        public static IEnumerable<string> AutoCompleteEmoji(string term) => Repo.AutoCompleteEmoji(term);
+        public static IEnumerable<ApiEmoji> GetEmojisByCategory(string category) => Repo.GetEmojisByCategory(category);
+        public static IEnumerable<ApiEmojiCategory> GetEmojiCategoriesGrouped() => Repo.GetEmojiCategoriesGrouped();
+        public static IEnumerable<int> SearchEmojiCategoryIds(List<string> categories) => Repo.SearchEmojiCategoryIds(categories);
+        public static List<ApiEmojiCategory> GetEmojiCategoriesByName(string name) => Repo.GetEmojiCategoriesByName(name);
+        public static void DeleteById(int id) => Repo.DeleteById(id);
+        public static ApiEmoji? GetEmojiByName(string name) => Repo.GetEmojiByName(name);
+        public static int UpsertEmoji(ApiUpsertEmoji emoji) => Repo.UpsertEmoji(emoji);
+        public static List<ApiEmoji> GetAllEmojisPaged(int pageNumber, string? orderBy = null, string? orderByDirection = null, List<string>? categories = null)
+            => Repo.GetAllEmojisPaged(pageNumber, orderBy, orderByDirection, categories);
+    }
 
-        public static IEnumerable<EmojiCategory> GetEmojiCategoriesGrouped()
-            => ManagedDataStorage.Emoji.Query<EmojiCategory>("GetEmojiCategoriesGrouped.sql");
+    public sealed class EmojiRepositoryEf : IEmojiRepository
+    {
+        public WikiDbContext Db { get; }
 
-        public static IEnumerable<int> SearchEmojiCategoryIds(List<string> categories)
+        public EmojiRepositoryEf(WikiDbContext db)
         {
-            return ManagedDataStorage.Emoji.Ephemeral(o =>
-            {
-                var param = new
+            Db = db;
+        }
+
+        public List<ApiEmoji> GetAllEmojis()
+            => Db.Emojis.AsNoTracking()
+                .OrderBy(e => e.Name)
+                .Select(MapEmoji)
+                .ToList();
+
+        public IEnumerable<string> AutoCompleteEmoji(string term)
+        {
+            term ??= string.Empty;
+
+            return Db.Emojis.AsNoTracking()
+                .Where(e => e.Name.Contains(term))
+                .OrderBy(e => e.Name)
+                .Select(e => e.Shortcut)
+                .Take(25)
+                .ToList();
+        }
+
+        public IEnumerable<ApiEmoji> GetEmojisByCategory(string category)
+        {
+            category ??= string.Empty;
+
+            return Db.Emojis.AsNoTracking()
+                .Where(e => Db.EmojiCategories.Any(c => c.EmojiId == e.Id && c.Category == category))
+                .OrderBy(e => e.Name)
+                .Select(MapEmoji)
+                .ToList();
+        }
+
+        public IEnumerable<ApiEmojiCategory> GetEmojiCategoriesGrouped()
+        {
+            return Db.EmojiCategories.AsNoTracking()
+                .GroupBy(c => c.Category)
+                .Select(g => new ApiEmojiCategory
                 {
-                    SearchTokenCount = categories.Count
-                };
-
-                using var tempTable = o.CreateTempTableFrom("TempCategories", categories);
-                return o.Query<int>("SearchEmojiCategoryIds.sql", param);
-            });
+                    EmojiId = 0,
+                    Category = g.Key,
+                    EmojiCount = g.Count().ToString()
+                })
+                .OrderByDescending(x => x.EmojiCount)
+                .ThenBy(x => x.Category)
+                .ToList();
         }
 
-        public static List<EmojiCategory> GetEmojiCategoriesByName(string name)
-        {
-            var param = new
-            {
-                Name = name
-            };
-
-            return ManagedDataStorage.Emoji.Query<EmojiCategory>("GetEmojiCategoriesByName.sql", param).ToList();
-        }
-
-        public static void DeleteById(int id)
-        {
-            var param = new
-            {
-                Id = id
-            };
-
-            ManagedDataStorage.Emoji.Execute("DeleteEmojiById.sql", param);
-
-            ConfigurationRepository.ReloadEmojis();
-        }
-
-        public static Emoji? GetEmojiByName(string name)
-        {
-            var param = new
-            {
-                Name = name
-            };
-
-            return ManagedDataStorage.Emoji.QuerySingleOrDefault<Emoji>("GetEmojiByName.sql", param);
-        }
-
-        public static int UpsertEmoji(UpsertEmoji emoji)
-        {
-            int emojiId = ManagedDataStorage.Emoji.Ephemeral(o =>
-            {
-                var transaction = o.BeginTransaction();
-
-                try
-                {
-                    if (emoji.Id == null || emoji.Id == 0)
-                    {
-                        var param = new
-                        {
-                            Name = emoji.Name,
-                            ImageData = emoji.ImageData == null ? null : Utility.Compress(emoji.ImageData),
-                            MimeType = emoji.MimeType
-                        };
-                        emoji.Id = o.ExecuteScalar<int>("InsertEmoji.sql", param);
-                    }
-                    else
-                    {
-                        var param = new
-                        {
-                            EmojiId = emoji.Id,
-                            Name = emoji.Name,
-                            ImageData = emoji.ImageData == null ? null : Utility.Compress(emoji.ImageData),
-                            MimeType = emoji.MimeType
-                        };
-                        o.ExecuteScalar<int>("UpdateEmoji.sql", param);
-                    }
-
-                    var upsertEmojiCategoriesParam = new
-                    {
-                        EmojiId = emoji.Id
-                    };
-
-                    using var tempTable = o.CreateTempTableFrom("TempEmojiCategories", emoji.Categories, transaction);
-                    o.Execute("UpsertEmojiCategories.sql", upsertEmojiCategoriesParam);
-
-                    transaction.Commit();
-
-                    return (int)emoji.Id;
-                }
-                catch
-                {
-                    transaction.Rollback();
-                    throw;
-                }
-            });
-
-            ConfigurationRepository.ReloadEmojis();
-
-            return emojiId;
-        }
-
-        public static List<Emoji> GetAllEmojisPaged(int pageNumber,
-            string? orderBy = null, string? orderByDirection = null, List<string>? categories = null)
+        public IEnumerable<int> SearchEmojiCategoryIds(List<string> categories)
         {
             if (categories == null || categories.Count == 0)
             {
-                var param = new
-                {
-                    PageNumber = pageNumber,
-                    PageSize = GlobalConfiguration.PaginationSize
-                };
-
-                var query = RepositoryHelper.TransposeOrderby("GetAllEmojisPaged.sql", orderBy, orderByDirection);
-                return ManagedDataStorage.Emoji.Query<Emoji>(query, param).ToList();
+                return [];
             }
-            else
+
+            var normalized = categories
+                .Where(c => string.IsNullOrWhiteSpace(c) == false)
+                .Select(c => c.Trim())
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            return Db.EmojiCategories.AsNoTracking()
+                .Where(ec => normalized.Contains(ec.Category))
+                .Select(ec => ec.EmojiId)
+                .Distinct()
+                .ToList();
+        }
+
+        public List<ApiEmojiCategory> GetEmojiCategoriesByName(string name)
+        {
+            name ??= string.Empty;
+
+            return Db.EmojiCategories.AsNoTracking()
+                .Where(c => c.Category == name)
+                .Select(c => new ApiEmojiCategory { EmojiId = c.EmojiId, Category = c.Category })
+                .ToList();
+        }
+
+        public void DeleteById(int id)
+        {
+            var entity = Db.Emojis.SingleOrDefault(e => e.Id == id);
+            if (entity == null)
             {
-                var emojiCategoryIds = SearchEmojiCategoryIds(categories);
+                return;
+            }
 
-                var param = new
-                {
-                    PageNumber = pageNumber,
-                    PageSize = GlobalConfiguration.PaginationSize
-                };
+            Db.Emojis.Remove(entity);
+            Db.SaveChanges();
 
-                return ManagedDataStorage.Emoji.Ephemeral(o =>
+            ConfigurationRepository.ReloadEmojis();
+        }
+
+        public ApiEmoji? GetEmojiByName(string name)
+        {
+            name ??= string.Empty;
+            return Db.Emojis.AsNoTracking()
+                .Where(e => e.Name == name)
+                .Select(MapEmoji)
+                .SingleOrDefault();
+        }
+
+        public int UpsertEmoji(ApiUpsertEmoji emoji)
+        {
+            if (emoji == null)
+            {
+                throw new ArgumentNullException(nameof(emoji));
+            }
+
+            using var tx = Db.Database.BeginTransaction();
+
+            try
+            {
+                var categories = (emoji.Categories ?? [])
+                    .Where(c => string.IsNullOrWhiteSpace(c) == false)
+                    .Select(c => c.Trim())
+                    .Distinct(StringComparer.OrdinalIgnoreCase)
+                    .ToList();
+
+                var imageData = emoji.ImageData == null ? null : Utility.Compress(emoji.ImageData);
+
+                DalEmoji entity;
+
+                if (emoji.Id is null or 0)
                 {
-                    var getAllEmojisPagedByCategoriesParam = new
+                    entity = new DalEmoji
                     {
-                        SearchTokenCount = emojiCategoryIds.Count(),
-                        PageNumber = pageNumber,
-                        PageSize = GlobalConfiguration.PaginationSize
+                        Name = emoji.Name,
+                        Shortcut = emoji.Name, // preserved as best-effort until we verify legacy shortcut logic
+                        ImageData = imageData,
+                        MimeType = emoji.MimeType,
+                        Categories = string.Join(';', categories),
+                        PaginationPageCount = 0
                     };
 
-                    using var tempTable = o.CreateTempTableFrom("TempEmojiCategoryIds", emojiCategoryIds);
+                    Db.Emojis.Add(entity);
+                    Db.SaveChanges();
+                }
+                else
+                {
+                    entity = Db.Emojis.Single(e => e.Id == emoji.Id);
+                    entity.Name = emoji.Name;
+                    entity.ImageData = imageData;
+                    entity.MimeType = emoji.MimeType;
+                    entity.Categories = string.Join(';', categories);
+                    Db.SaveChanges();
+                }
 
-                    var query = RepositoryHelper.TransposeOrderby("GetAllEmojisPagedByCategories.sql", orderBy, orderByDirection);
-                    return o.Query<Emoji>(query, getAllEmojisPagedByCategoriesParam).ToList();
-                });
+                var existingCats = Db.EmojiCategories.Where(c => c.EmojiId == entity.Id);
+                Db.EmojiCategories.RemoveRange(existingCats);
+                Db.SaveChanges();
+
+                foreach (var cat in categories)
+                {
+                    Db.EmojiCategories.Add(new DalEmojiCategory { EmojiId = entity.Id, Category = cat });
+                }
+
+                Db.SaveChanges();
+                tx.Commit();
+
+                ConfigurationRepository.ReloadEmojis();
+
+                return entity.Id;
+            }
+            catch
+            {
+                tx.Rollback();
+                throw;
             }
         }
+
+        public List<ApiEmoji> GetAllEmojisPaged(int pageNumber, string? orderBy, string? orderByDirection, List<string>? categories)
+        {
+            var pageSize = GlobalConfiguration.PaginationSize;
+            var skip = Math.Max(0, pageNumber - 1) * pageSize;
+
+            IQueryable<DalEmoji> query = Db.Emojis.AsNoTracking();
+
+            if (categories is { Count: > 0 })
+            {
+                var emojiIds = this.SearchEmojiCategoryIds(categories);
+                query = query.Where(e => emojiIds.Contains(e.Id));
+            }
+
+            query = ApplyOrderBy(query, orderBy, orderByDirection);
+
+            return query
+                .Skip(skip)
+                .Take(pageSize)
+                .Select(MapEmoji)
+                .ToList();
+        }
+
+        private static IQueryable<DalEmoji> ApplyOrderBy(IQueryable<DalEmoji> query, string? orderBy, string? orderByDirection)
+        {
+            var asc = string.Equals(orderByDirection, "asc", StringComparison.OrdinalIgnoreCase);
+
+            return (orderBy ?? string.Empty).ToLowerInvariant() switch
+            {
+                "name" => asc ? query.OrderBy(e => e.Name) : query.OrderByDescending(e => e.Name),
+                "id" => asc ? query.OrderBy(e => e.Id) : query.OrderByDescending(e => e.Id),
+                _ => query.OrderBy(e => e.Name)
+            };
+        }
+
+        private static ApiEmoji MapEmoji(DalEmoji e) => new()
+        {
+            Id = e.Id,
+            Name = e.Name,
+            Shortcut = e.Shortcut,
+            PaginationPageCount = e.PaginationPageCount,
+            Categories = e.Categories,
+            ImageData = e.ImageData,
+            MimeType = e.MimeType,
+        };
     }
 }

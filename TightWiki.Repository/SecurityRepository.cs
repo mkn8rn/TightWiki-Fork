@@ -5,13 +5,50 @@ using TightWiki.Library;
 
 namespace TightWiki.Repository
 {
+    public interface ISecurityRepository
+    {
+        Task ValidateEncryptionAndCreateAdminUserAsync(UserManager<IdentityUser> userManager);
+        Task UpsertUserClaimsAsync(UserManager<IdentityUser> userManager, IdentityUser user, List<Claim> givenClaims);
+    }
+
+
     public static class SecurityRepository
     {
+        private static IServiceProvider? _serviceProvider;
+        public static void UseServiceProvider(IServiceProvider serviceProvider) => _serviceProvider = serviceProvider;
+
+        private static ISecurityRepository Repo =>
+            _serviceProvider?.GetService(typeof(ISecurityRepository)) as ISecurityRepository
+            ?? throw new InvalidOperationException("ISecurityRepository is not configured.");
+
         /// <summary>
         /// Detect whether this is the first time the WIKI has ever been run and do some initialization.
         /// Adds the first user with the email and password contained in Constants.DEFAULTUSERNAME and Constants.DEFAULTPASSWORD
         /// </summary>
-        public static async void ValidateEncryptionAndCreateAdminUser(UserManager<IdentityUser> userManager)
+        public static async Task ValidateEncryptionAndCreateAdminUserAsync(UserManager<IdentityUser> userManager)
+            => await Repo.ValidateEncryptionAndCreateAdminUserAsync(userManager);
+
+        public static async Task UpsertUserClaimsAsync(UserManager<IdentityUser> userManager, IdentityUser user, List<Claim> givenClaims)
+            => await Repo.UpsertUserClaimsAsync(userManager, user, givenClaims);
+
+        /// <summary>
+        /// Synchronous wrapper for backwards compatibility. Prefer UpsertUserClaimsAsync.
+        /// </summary>
+        public static void UpsertUserClaims(UserManager<IdentityUser> userManager, IdentityUser user, List<Claim> givenClaims)
+            => Repo.UpsertUserClaimsAsync(userManager, user, givenClaims).GetAwaiter().GetResult();
+    }
+
+    public sealed class SecurityRepositoryEf : ISecurityRepository
+    {
+        public SecurityRepositoryEf()
+        {
+        }
+
+        /// <summary>
+        /// Detect whether this is the first time the WIKI has ever been run and do some initialization.
+        /// Adds the first user with the email and password contained in Constants.DEFAULTUSERNAME and Constants.DEFAULTPASSWORD
+        /// </summary>
+        public async Task ValidateEncryptionAndCreateAdminUserAsync(UserManager<IdentityUser> userManager)
         {
             if (ConfigurationRepository.IsFirstRun())
             {
@@ -45,6 +82,7 @@ namespace TightWiki.Repository
                 }
 
                 var membershipConfig = ConfigurationRepository.GetConfigurationEntryValuesByGroupName(Constants.ConfigurationGroup.Membership);
+                var customizationConfig = ConfigurationRepository.GetConfigurationEntryValuesByGroupName(Constants.ConfigurationGroup.Customization);
 
                 var claimsToAdd = new List<Claim>
                     {
@@ -52,9 +90,10 @@ namespace TightWiki.Repository
                         new ("timezone", membershipConfig.Value<string>("Default TimeZone").EnsureNotNull()),
                         new (ClaimTypes.Country, membershipConfig.Value<string>("Default Country").EnsureNotNull()),
                         new ("language", membershipConfig.Value<string>("Default Language").EnsureNotNull()),
+                        new ("theme", customizationConfig.Value<string>("Theme").EnsureNotNull()),
                     };
 
-                UpsertUserClaims(userManager, user, claimsToAdd);
+                await UpsertUserClaimsAsync(userManager, user, claimsToAdd);
 
                 var token = await userManager.GeneratePasswordResetTokenAsync(user.EnsureNotNull());
                 var result = await userManager.ResetPasswordAsync(user, token, Constants.DEFAULTPASSWORD);
@@ -65,19 +104,24 @@ namespace TightWiki.Repository
 
                 UsersRepository.SetAdminPasswordIsDefault();
 
+                var userId = Guid.Parse(user.Id);
                 var existingProfileUserId = UsersRepository.GetUserAccountIdByNavigation(Navigation.Clean(Constants.DEFAULTACCOUNT));
                 if (existingProfileUserId == null)
                 {
-                    UsersRepository.CreateProfile(Guid.Parse(user.Id), Constants.DEFAULTACCOUNT);
+                    UsersRepository.CreateProfile(userId, Constants.DEFAULTACCOUNT);
                 }
                 else
                 {
-                    UsersRepository.SetProfileUserId(Constants.DEFAULTACCOUNT, Guid.Parse(user.Id));
+                    UsersRepository.SetProfileUserId(Constants.DEFAULTACCOUNT, userId);
                 }
+
+                // Add admin user to the Administrator role in AccountRoles table
+                // This is necessary for the permission system to recognize them as an admin
+                UsersRepository.AddRoleMemberByname(userId, "Administrator");
             }
         }
 
-        public static async void UpsertUserClaims(UserManager<IdentityUser> userManager, IdentityUser user, List<Claim> givenClaims)
+        public async Task UpsertUserClaimsAsync(UserManager<IdentityUser> userManager, IdentityUser user, List<Claim> givenClaims)
         {
             // Get existing claims for the user
             var existingClaims = await userManager.GetClaimsAsync(user);

@@ -86,6 +86,7 @@
         $('a.nav-link').removeClass('text-dark').addClass('@sessionState.UserTheme.ClassNavLink');
         $('a.dropdown-item').removeClass('text-dark').addClass('@sessionState.UserTheme.ClassDropdown');
         $('span.glyphicon').removeClass('text-dark').addClass('@sessionState.UserTheme.ClassBranding');
+        $('nav button.btn-outline-primary').removeClass('btn-outline-primary').addClass('@(sessionState.UserTheme.ClassNavLink.Contains("text-light", StringComparison.OrdinalIgnoreCase) ? "btn-outline-light" : "btn-outline-dark")');
         });
     </script>
 

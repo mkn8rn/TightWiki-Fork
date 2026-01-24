@@ -19,6 +19,7 @@ using TightWiki.Engine;
 using TightWiki.Engine.Implementation;
 using TightWiki.Engine.Implementation.Handlers;
 using TightWiki.Engine.Library.Interfaces;
+using DAL;
 using TightWiki.Library;
 using TightWiki.Library.Interfaces;
 using TightWiki.Models;
@@ -29,34 +30,69 @@ namespace TightWiki
 {
     public class Program
     {
-        public static void Main(string[] args)
+        public static async Task Main(string[] args)
         {
             SqlMapper.AddTypeHandler(new GuidTypeHandler());
 
             var builder = WebApplication.CreateBuilder(args);
 
-            builder.Services.AddDbContext<ApplicationDbContext>(options =>
-                options.UseSqlite(builder.Configuration.GetConnectionString("UsersConnection")));
+            const string postgresConnectionString = "Host=localhost;Port=5432;Database=tightwiki_db;Username=postgres;Password=123456";
 
-            ManagedDataStorage.Pages.SetConnectionString(builder.Configuration.GetConnectionString("PagesConnection"));
-            ManagedDataStorage.DeletedPages.SetConnectionString(builder.Configuration.GetConnectionString("DeletedPagesConnection"));
-            ManagedDataStorage.DeletedPageRevisions.SetConnectionString(builder.Configuration.GetConnectionString("DeletedPageRevisionsConnection"));
-            ManagedDataStorage.Statistics.SetConnectionString(builder.Configuration.GetConnectionString("StatisticsConnection"));
-            ManagedDataStorage.Emoji.SetConnectionString(builder.Configuration.GetConnectionString("EmojiConnection"));
-            ManagedDataStorage.Exceptions.SetConnectionString(builder.Configuration.GetConnectionString("ExceptionsConnection"));
-            ManagedDataStorage.Users.SetConnectionString(builder.Configuration.GetConnectionString("UsersConnection"));
-            ManagedDataStorage.Config.SetConnectionString(builder.Configuration.GetConnectionString("ConfigConnection"));
+            builder.Services.AddDbContext<IdentityDbContext>(options =>
+                options.UseNpgsql(postgresConnectionString, o =>
+                    o.MigrationsAssembly("DAL")
+                     .MigrationsHistoryTable("__EFMigrationsHistory_Identity")));
 
-            DatabaseUpgrade.UpgradeDatabase();
-            ConfigurationRepository.ReloadEverything();
+
+            builder.Services.AddDbContext<WikiDbContext>(options =>
+                options.UseNpgsql(postgresConnectionString, o =>
+                    o.MigrationsAssembly("DAL")
+                     .MigrationsHistoryTable("__EFMigrationsHistory_Wiki")));
+
+            builder.Services.AddScoped<IEmojiRepository, EmojiRepositoryEf>();
+            builder.Services.AddScoped<IConfigurationRepository, ConfigurationRepositoryEf>();
+            builder.Services.AddScoped<IUsersRepository, UsersRepositoryEf>();
+            builder.Services.AddScoped<IStatisticsRepository, StatisticsRepositoryEf>();
+            builder.Services.AddScoped<ISpannedRepository, SpannedRepositoryEf>();
+            builder.Services.AddScoped<IExceptionRepository, ExceptionRepositoryEf>();
+            builder.Services.AddScoped<IPageFileRepository, PageFileRepositoryEf>();
+            builder.Services.AddScoped<IPageRepository, PageRepositoryEf>();
+            builder.Services.AddScoped<ISecurityRepository, SecurityRepositoryEf>();
+
+            // Build a temporary service provider for startup configuration.
+            // This allows repositories to be used during service registration (e.g., for authentication config).
+            // After app.Build(), we call UseServiceProvider again with app.Services for runtime use.
+            var tempServiceProvider = builder.Services.BuildServiceProvider();
+            EmojiRepository.UseServiceProvider(tempServiceProvider);
+            ConfigurationRepository.UseServiceProvider(tempServiceProvider);
+            UsersRepository.UseServiceProvider(tempServiceProvider);
+            StatisticsRepository.UseServiceProvider(tempServiceProvider);
+            SpannedRepository.UseServiceProvider(tempServiceProvider);
+            ExceptionRepository.UseServiceProvider(tempServiceProvider);
+            PageFileRepository.UseServiceProvider(tempServiceProvider);
+            PageRepository.UseServiceProvider(tempServiceProvider);
+            SecurityRepository.UseServiceProvider(tempServiceProvider);
+
+            // SQLite specific initialization. Disabled until repositories are migrated to Postgres.
+
+            // ManagedDataStorage.Pages.SetConnectionString(builder.Configuration.GetConnectionString("PagesConnection"));
+            // ManagedDataStorage.DeletedPages.SetConnectionString(builder.Configuration.GetConnectionString("DeletedPagesConnection"));
+            // ManagedDataStorage.DeletedPageRevisions.SetConnectionString(builder.Configuration.GetConnectionString("DeletedPageRevisionsConnection"));
+            // ManagedDataStorage.Statistics.SetConnectionString(builder.Configuration.GetConnectionString("StatisticsConnection"));
+            // ManagedDataStorage.Emoji.SetConnectionString(builder.Configuration.GetConnectionString("EmojiConnection"));
+            // ManagedDataStorage.Exceptions.SetConnectionString(builder.Configuration.GetConnectionString("ExceptionsConnection"));
+            // ManagedDataStorage.Users.SetConnectionString(builder.Configuration.GetConnectionString("UsersConnection"));
+            // ManagedDataStorage.Config.SetConnectionString(builder.Configuration.GetConnectionString("ConfigConnection"));
+            //
+            // DatabaseUpgrade.UpgradeDatabase();
+            // ConfigurationRepository.ReloadEverything();
 
             // Add DiffPlex services.
             builder.Services.AddScoped<IDiffer, Differ>();
             builder.Services.AddScoped<ISideBySideDiffBuilder>(sp =>
                 new SideBySideDiffBuilder(sp.GetRequiredService<IDiffer>()));
 
-            var membershipConfig = ConfigurationRepository.GetConfigurationEntryValuesByGroupName(Constants.ConfigurationGroup.Membership);
-            var requireConfirmedAccount = membershipConfig.Value<bool>("Require Email Verification");
+            var requireConfirmedAccount = false;
 
             // Add services to the container.
             builder.Services.AddDatabaseDeveloperPageExceptionFilter();
@@ -116,7 +152,7 @@ namespace TightWiki
             builder.Services.AddSingleton<IWikiEmailSender, WikiEmailSender>();
 
             builder.Services.AddDefaultIdentity<IdentityUser>(options => options.SignIn.RequireConfirmedAccount = requireConfirmedAccount)
-                .AddEntityFrameworkStores<ApplicationDbContext>();
+                .AddEntityFrameworkStores<IdentityDbContext>();
 
             var externalAuthenticationConfig = ConfigurationRepository.GetConfigurationEntryValuesByGroupName(Constants.ConfigurationGroup.ExternalAuthentication);
             var basicConfig = ConfigurationRepository.GetConfigurationEntryValuesByGroupName(Constants.ConfigurationGroup.Basic);
@@ -288,7 +324,59 @@ namespace TightWiki
                 });
             }
 
+
             var app = builder.Build();
+
+            // Update repositories to use the final built app's service provider for runtime.
+            // This replaces the temporary service provider used during startup configuration.
+            EmojiRepository.UseServiceProvider(app.Services);
+            ConfigurationRepository.UseServiceProvider(app.Services);
+            UsersRepository.UseServiceProvider(app.Services);
+            StatisticsRepository.UseServiceProvider(app.Services);
+            SpannedRepository.UseServiceProvider(app.Services);
+            ExceptionRepository.UseServiceProvider(app.Services);
+            PageFileRepository.UseServiceProvider(app.Services);
+            PageRepository.UseServiceProvider(app.Services);
+            SecurityRepository.UseServiceProvider(app.Services);
+
+            // TEMPORARY HACK: Wipe and recreate the database on every startup for development.
+            // Remove this block when database schema is stable!
+            using (var scope = app.Services.CreateScope())
+            {
+                var wikiDb = scope.ServiceProvider.GetRequiredService<WikiDbContext>();
+                var identityDb = scope.ServiceProvider.GetRequiredService<IdentityDbContext>();
+                var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+
+                logger.LogWarning("?? DEVELOPMENT MODE: Wiping database on startup...");
+                
+                // Delete the database once (both contexts share the same database)
+                wikiDb.Database.EnsureDeleted();
+                
+                // Create tables for WikiDbContext
+                wikiDb.Database.EnsureCreated();
+                
+                // EnsureCreated() won't create IdentityDbContext tables because the database already exists.
+                // Use raw SQL to create the Identity tables using the model's generated SQL.
+                var identityRelationalDb = identityDb.Database;
+                var identitySql = identityRelationalDb.GenerateCreateScript();
+                identityRelationalDb.ExecuteSqlRaw(identitySql);
+                
+                logger.LogWarning("?? DEVELOPMENT MODE: Database wiped and recreated.");
+            }
+
+            // Seed the database with initial data (themes, configuration, etc.)
+            using (var scope = app.Services.CreateScope())
+            {
+                var wikiDb = scope.ServiceProvider.GetRequiredService<WikiDbContext>();
+                var logger = scope.ServiceProvider.GetRequiredService<ILogger<Program>>();
+                logger.LogInformation("Starting database seeding from Program.cs...");
+                DatabaseSeeder.SeedDatabase(wikiDb, logger);
+                logger.LogInformation("Database seeding completed from Program.cs.");
+            }
+
+            // Reload all configuration after seeding to ensure GlobalConfiguration is populated.
+            // This must happen after seeding so that themes, menu items, and other config values are available.
+            ConfigurationRepository.ReloadEverything();
 
             //Configure the HTTP request pipeline.
             if (app.Environment.IsDevelopment())
@@ -331,7 +419,7 @@ namespace TightWiki
                 });
             }
 
-            //Global localization providers.
+            // Global localization providers.
             var localizer = app.Services.GetRequiredService<IStringLocalizer<StaticLocalizer>>();
             StaticLocalizer.Initialize(localizer);
             PageSelectorGenerator.Initialize(localizer);
@@ -361,13 +449,14 @@ namespace TightWiki
             //
             // to do language route
 
+            // Validate encryption and create admin user if needed.
             using (var scope = app.Services.CreateScope())
             {
                 var services = scope.ServiceProvider;
                 try
                 {
                     var userManager = services.GetRequiredService<UserManager<IdentityUser>>();
-                    SecurityRepository.ValidateEncryptionAndCreateAdminUser(userManager);
+                    await SecurityRepository.ValidateEncryptionAndCreateAdminUserAsync(userManager);
                 }
                 catch (Exception ex)
                 {

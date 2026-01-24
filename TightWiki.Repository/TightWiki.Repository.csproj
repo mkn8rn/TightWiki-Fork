@@ -387,6 +387,8 @@
   <ItemGroup>
     <PackageReference Include="DuoVia.FuzzyStrings" />
     <PackageReference Include="Magick.NET-Q8-AnyCPU" />
+    <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+    <PackageReference Include="Microsoft.EntityFrameworkCore" />
   </ItemGroup>
 
   <ItemGroup>
@@ -394,6 +396,7 @@
     <ProjectReference Include="..\TightWiki.Engine.Library\TightWiki.Engine.Library.csproj" />
     <ProjectReference Include="..\TightWiki.Models\TightWiki.Models.csproj" />
     <ProjectReference Include="..\TightWiki.Security\TightWiki.Security.csproj" />
+    <ProjectReference Include="..\DAL\DAL.csproj" />
   </ItemGroup>
 
   <ItemGroup>

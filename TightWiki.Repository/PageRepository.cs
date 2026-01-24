@@ -1,276 +1,159 @@
-﻿using DuoVia.FuzzyStrings;
-using Microsoft.EntityFrameworkCore.Metadata;
+using DAL;
+using DuoVia.FuzzyStrings;
+using Microsoft.EntityFrameworkCore;
 using NTDLS.Helpers;
-using NTDLS.SqliteDapperWrapper;
 using TightWiki.Caching;
 using TightWiki.Engine.Library;
 using TightWiki.Library;
 using TightWiki.Models;
-using TightWiki.Models.DataModels;
+using DalPageEntity = DAL.Models.PageEntity;
+using DalPageRevisionEntity = DAL.Models.PageRevisionEntity;
+using DalPageTagEntity = DAL.Models.PageTagEntity;
+using DalProcessingInstructionEntity = DAL.Models.ProcessingInstructionEntity;
+using DalPageCommentEntity = DAL.Models.PageCommentEntity;
+using DalPageReferenceEntity = DAL.Models.PageReferenceEntity;
+using DalPageTokenEntity = DAL.Models.PageTokenEntity;
+using DalDeletedPageEntity = DAL.Models.DeletedPageEntity;
+using DalDeletedPageRevisionEntity = DAL.Models.DeletedPageRevisionEntity;
+using ApiPage = TightWiki.Models.DataModels.Page;
+using ApiPageRevision = TightWiki.Models.DataModels.PageRevision;
+using ApiPageTag = TightWiki.Models.DataModels.PageTag;
+using ApiPageToken = TightWiki.Models.DataModels.PageToken;
+using ApiPageComment = TightWiki.Models.DataModels.PageComment;
+using ApiPageSearchToken = TightWiki.Models.DataModels.PageSearchToken;
+using ApiProcessingInstruction = TightWiki.Models.DataModels.ProcessingInstruction;
+using ApiProcessingInstructionCollection = TightWiki.Models.DataModels.ProcessingInstructionCollection;
+using ApiRelatedPage = TightWiki.Models.DataModels.RelatedPage;
+using ApiNonexistentPage = TightWiki.Models.DataModels.NonexistentPage;
+using ApiNamespaceStat = TightWiki.Models.DataModels.NamespaceStat;
+using ApiFeatureTemplate = TightWiki.Models.DataModels.FeatureTemplate;
+using ApiDeletedPageRevision = TightWiki.Models.DataModels.DeletedPageRevision;
+using ApiTagAssociation = TightWiki.Models.DataModels.TagAssociation;
+using ApiPageReference = TightWiki.Engine.Library.PageReference;
 
 namespace TightWiki.Repository
 {
+    public interface IPageRepository
+    {
+        IEnumerable<ApiPage> AutoCompletePage(string? searchText);
+        IEnumerable<string> AutoCompleteNamespace(string? searchText);
+        ApiPage? GetPageRevisionInfoById(int pageId, int? revision = null);
+        ApiProcessingInstructionCollection GetPageProcessingInstructionsByPageId(int pageId);
+        List<ApiPageTag> GetPageTagsById(int pageId);
+        List<ApiPageRevision> GetPageRevisionsInfoByNavigationPaged(string navigation, int pageNumber, string? orderBy = null, string? orderByDirection = null, int? pageSize = null);
+        List<ApiPageRevision> GetTopRecentlyModifiedPagesInfoByUserId(Guid userId, int topCount);
+        string? GetPageNavigationByPageId(int pageId);
+        List<ApiPage> GetTopRecentlyModifiedPagesInfo(int topCount);
+        List<ApiPage> PageSearch(List<string> searchTerms);
+        List<ApiPage> PageSearchPaged(List<string> searchTerms, int pageNumber, int? pageSize = null, bool? allowFuzzyMatching = null);
+        List<ApiRelatedPage> GetSimilarPagesPaged(int pageId, int similarity, int pageNumber, int? pageSize = null);
+        List<ApiRelatedPage> GetRelatedPagesPaged(int pageId, int pageNumber, int? pageSize = null);
+        void InsertPageComment(int pageId, Guid userId, string body);
+        void DeletePageCommentById(int pageId, int commentId);
+        void DeletePageCommentByUserAndId(int pageId, Guid userId, int commentId);
+        List<ApiPageComment> GetPageCommentsPaged(string navigation, int pageNumber);
+        List<ApiNonexistentPage> GetMissingPagesPaged(int pageNumber, string? orderBy = null, string? orderByDirection = null);
+        void UpdateSinglePageReference(string pageNavigation, int pageId);
+        void UpdatePageReferences(int pageId, List<ApiPageReference> referencesPageNavigations);
+        List<ApiPage> GetAllPagesByInstructionPaged(int pageNumber, string? instruction = null);
+        List<int> GetDeletedPageIdsByTokens(List<string>? tokens);
+        List<int> GetPageIdsByTokens(List<string>? tokens);
+        List<ApiPage> GetAllNamespacePagesPaged(int pageNumber, string namespaceName, string? orderBy = null, string? orderByDirection = null);
+        List<ApiPage> GetAllPagesPaged(int pageNumber, string? orderBy = null, string? orderByDirection = null, List<string>? searchTerms = null);
+        List<ApiPage> GetAllDeletedPagesPaged(int pageNumber, string? orderBy = null, string? orderByDirection = null, List<string>? searchTerms = null);
+        List<ApiNamespaceStat> GetAllNamespacesPaged(int pageNumber, string? orderBy = null, string? orderByDirection = null);
+        List<string> GetAllNamespaces();
+        List<ApiPage> GetAllPages();
+        List<ApiPage> GetAllTemplatePages();
+        List<ApiFeatureTemplate> GetAllFeatureTemplates();
+        void UpdatePageProcessingInstructions(int pageId, List<string> instructions);
+        ApiPage? GetPageRevisionById(int pageId, int? revision = null);
+        void SavePageSearchTokens(List<ApiPageToken> items);
+        void TruncateAllPageRevisions(string confirm);
+        int GetCurrentPageRevision(int pageId);
+        ApiPage? GetLimitedPageInfoByIdAndRevision(int pageId, int? revision = null);
+        int SavePage(ApiPage page);
+        ApiPage? GetPageInfoByNavigation(string navigation);
+        int GetPageRevisionCountByPageId(int pageId);
+        void RestoreDeletedPageByPageId(int pageId);
+        void MovePageRevisionToDeletedById(int pageId, int revision, Guid userId);
+        void MovePageToDeletedById(int pageId, Guid userId);
+        void PurgeDeletedPageByPageId(int pageId);
+        void PurgeDeletedPages();
+        int GetCountOfPageAttachmentsById(int pageId);
+        ApiPage? GetDeletedPageById(int pageId);
+        ApiPage? GetLatestPageRevisionById(int pageId);
+        int GetPageNextRevision(int pageId, int revision);
+        int GetPagePreviousRevision(int pageId, int revision);
+        List<ApiDeletedPageRevision> GetDeletedPageRevisionsByIdPaged(int pageId, int pageNumber, string? orderBy = null, string? orderByDirection = null);
+        void PurgeDeletedPageRevisions();
+        void PurgeDeletedPageRevisionsByPageId(int pageId);
+        void PurgeDeletedPageRevisionByPageIdAndRevision(int pageId, int revision);
+        void RestoreDeletedPageRevisionByPageIdAndRevision(int pageId, int revision);
+        ApiDeletedPageRevision? GetDeletedPageRevisionById(int pageId, int revision);
+        ApiPage? GetPageRevisionByNavigation(NamespaceNavigation navigation, int? revision = null);
+        ApiPage? GetPageRevisionByNavigation(string givenNavigation, int? revision = null, bool refreshCache = false);
+        List<ApiTagAssociation> GetAssociatedTags(string tag);
+        List<ApiPage> GetPageInfoByNamespaces(List<string> namespaces);
+        List<ApiPage> GetPageInfoByTags(List<string> tags);
+        List<ApiPage> GetPageInfoByTag(string tag);
+        void UpdatePageTags(int pageId, List<string> tags);
+    }
+
     public static class PageRepository
     {
-        public static IEnumerable<Page> AutoCompletePage(string? searchText)
-            => ManagedDataStorage.Pages.Query<Page>("AutoCompletePage.sql", new { SearchText = searchText ?? string.Empty });
+        private static IServiceProvider? _serviceProvider;
+        public static void UseServiceProvider(IServiceProvider serviceProvider) => _serviceProvider = serviceProvider;
+
+        private static IPageRepository Repo =>
+            _serviceProvider?.GetService(typeof(IPageRepository)) as IPageRepository
+            ?? throw new InvalidOperationException("IPageRepository is not configured.");
+
+        public static IEnumerable<ApiPage> AutoCompletePage(string? searchText)
+            => Repo.AutoCompletePage(searchText);
 
         public static IEnumerable<string> AutoCompleteNamespace(string? searchText)
-            => ManagedDataStorage.Pages.Query<string>("AutoCompleteNamespace.sql", new { SearchText = searchText ?? string.Empty });
+            => Repo.AutoCompleteNamespace(searchText);
 
-        public static Page? GetPageRevisionInfoById(int pageId, int? revision = null)
-        {
-            var param = new
-            {
-                PageId = pageId,
-                Revision = revision
-            };
+        public static ApiPage? GetPageRevisionInfoById(int pageId, int? revision = null)
+            => Repo.GetPageRevisionInfoById(pageId, revision);
 
-            return ManagedDataStorage.Pages.QuerySingleOrDefault<Page>("GetPageRevisionInfoById.sql", param);
-        }
-
-        public static ProcessingInstructionCollection GetPageProcessingInstructionsByPageId(int pageId)
+        public static ApiProcessingInstructionCollection GetPageProcessingInstructionsByPageId(int pageId)
         {
             var cacheKey = WikiCacheKeyFunction.Build(WikiCache.Category.Page, [pageId]);
-
-            return WikiCache.AddOrGet(cacheKey, () =>
-            {
-                var param = new
-                {
-                    PageId = pageId
-                };
-
-                return new ProcessingInstructionCollection()
-                {
-                    Collection = ManagedDataStorage.Pages.Query<ProcessingInstruction>("GetPageProcessingInstructionsByPageId.sql", param).ToList()
-                };
-            }).EnsureNotNull();
+            return WikiCache.AddOrGet(cacheKey, () => Repo.GetPageProcessingInstructionsByPageId(pageId)).EnsureNotNull();
         }
 
-        public static List<PageTag> GetPageTagsById(int pageId)
+        public static List<ApiPageTag> GetPageTagsById(int pageId)
         {
             var cacheKey = WikiCacheKeyFunction.Build(WikiCache.Category.Page, [pageId]);
-
-            return WikiCache.AddOrGet(cacheKey, () =>
-            {
-                var param = new
-                {
-                    PageId = pageId
-                };
-
-                return ManagedDataStorage.Pages.Query<PageTag>("GetPageTagsById.sql", param).ToList();
-            }).EnsureNotNull();
+            return WikiCache.AddOrGet(cacheKey, () => Repo.GetPageTagsById(pageId)).EnsureNotNull();
         }
 
-        public static List<PageRevision> GetPageRevisionsInfoByNavigationPaged(
+        public static List<ApiPageRevision> GetPageRevisionsInfoByNavigationPaged(
             string navigation, int pageNumber, string? orderBy = null, string? orderByDirection = null, int? pageSize = null)
-        {
-            pageSize ??= GlobalConfiguration.PaginationSize;
+            => Repo.GetPageRevisionsInfoByNavigationPaged(navigation, pageNumber, orderBy, orderByDirection, pageSize);
 
-            var param = new
-            {
-                Navigation = navigation,
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            };
-
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("users.db", "users_db");
-
-                var query = RepositoryHelper.TransposeOrderby("GetPageRevisionsInfoByNavigationPaged.sql", orderBy, orderByDirection);
-                return o.Query<PageRevision>(query, param).ToList();
-            });
-        }
-
-        public static List<PageRevision> GetTopRecentlyModifiedPagesInfoByUserId(Guid userId, int topCount)
-        {
-            var param = new
-            {
-                UserId = userId,
-                TopCount = topCount
-            };
-
-            return ManagedDataStorage.Pages.Query<PageRevision>("GetTopRecentlyModifiedPagesInfoByUserId.sql", param).ToList();
-        }
+        public static List<ApiPageRevision> GetTopRecentlyModifiedPagesInfoByUserId(Guid userId, int topCount)
+            => Repo.GetTopRecentlyModifiedPagesInfoByUserId(userId, topCount);
 
         public static string? GetPageNavigationByPageId(int pageId)
-        {
-            var param = new
-            {
-                PageId = pageId
-            };
+            => Repo.GetPageNavigationByPageId(pageId);
 
-            return ManagedDataStorage.Pages.ExecuteScalar<string>("GetPageNavigationByPageId.sql", param);
-        }
+        public static List<ApiPage> GetTopRecentlyModifiedPagesInfo(int topCount)
+            => Repo.GetTopRecentlyModifiedPagesInfo(topCount);
 
-        public static List<Page> GetTopRecentlyModifiedPagesInfo(int topCount)
-        {
-            var param = new
-            {
-                TopCount = topCount
-            };
+        public static List<ApiPage> PageSearch(List<string> searchTerms)
+            => Repo.PageSearch(searchTerms);
 
-            return ManagedDataStorage.Pages.Query<Page>("GetTopRecentlyModifiedPagesInfo.sql", param).ToList();
-        }
+        public static List<ApiPage> PageSearchPaged(List<string> searchTerms, int pageNumber, int? pageSize = null, bool? allowFuzzyMatching = null)
+            => Repo.PageSearchPaged(searchTerms, pageNumber, pageSize, allowFuzzyMatching);
 
-        private static List<PageSearchToken> GetFuzzyPageSearchTokens(List<PageToken> tokens, double minimumMatchScore)
-        {
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var param = new
-                {
-                    MinimumMatchScore = minimumMatchScore,
-                    TokenCount = tokens.Count
-                };
+        public static List<ApiRelatedPage> GetSimilarPagesPaged(int pageId, int similarity, int pageNumber, int? pageSize = null)
+            => Repo.GetSimilarPagesPaged(pageId, similarity, pageNumber, pageSize);
 
-                using var tempTable = o.CreateTempTableFrom("TempSearchTerms", tokens.Distinct());
-                return o.Query<PageSearchToken>("GetFuzzyPageSearchTokens.sql", param).ToList();
-            });
-        }
-
-        private static List<PageSearchToken> GetExactPageSearchTokens(List<PageToken> tokens, double minimumMatchScore)
-        {
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var param = new
-                {
-                    MinimumMatchScore = minimumMatchScore,
-                    TokenCount = tokens.Count
-                };
-
-                using var tempTable = o.CreateTempTableFrom("TempSearchTerms", tokens.Distinct());
-                return o.Query<PageSearchToken>("GetExactPageSearchTokens.sql", param).ToList();
-            });
-        }
-
-        private static List<PageSearchToken> GetMeteredPageSearchTokens(List<string> searchTerms, bool allowFuzzyMatching)
-        {
-            var cacheKey = WikiCacheKeyFunction.Build(WikiCache.Category.Search, [string.Join(',', searchTerms), allowFuzzyMatching]);
-
-            return WikiCache.AddOrGet(cacheKey, () =>
-            {
-                var minimumMatchScore = ConfigurationRepository.Get<float>("Search", "Minimum Match Score");
-
-                var searchTokens = (from o in searchTerms
-                                    select new PageToken
-                                    {
-                                        Token = o,
-                                        DoubleMetaphone = o.ToDoubleMetaphone()
-                                    }).ToList();
-
-                if (allowFuzzyMatching == true)
-                {
-                    var allTokens = GetExactPageSearchTokens(searchTokens, minimumMatchScore / 2.0);
-                    var fuzzyTokens = GetFuzzyPageSearchTokens(searchTokens, minimumMatchScore / 2.0);
-
-                    allTokens.AddRange(fuzzyTokens);
-
-                    return allTokens
-                            .GroupBy(token => token.PageId)
-                            .Where(group => group.Sum(g => g.Score) >= minimumMatchScore) // Filtering groups
-                            .Select(group => new PageSearchToken
-                            {
-                                PageId = group.Key,
-                                Match = group.Max(g => g.Match),
-                                Weight = group.Max(g => g.Weight),
-                                Score = group.Max(g => g.Score)
-                            }).ToList();
-                }
-                else
-                {
-                    return GetExactPageSearchTokens(searchTokens, minimumMatchScore / 2.0);
-                }
-            }).EnsureNotNull();
-        }
-
-        public static List<Page> PageSearch(List<string> searchTerms)
-        {
-            if (searchTerms.Count == 0)
-            {
-                return new List<Page>();
-            }
-
-            bool allowFuzzyMatching = ConfigurationRepository.Get<bool>("Search", "Allow Fuzzy Matching");
-            var meteredSearchTokens = GetMeteredPageSearchTokens(searchTerms, allowFuzzyMatching == true);
-            if (meteredSearchTokens.Count == 0)
-            {
-                return new List<Page>();
-            }
-
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var param = new
-                {
-                    MaximumScore = meteredSearchTokens.Max(t => t.Score)
-                };
-
-                using var users_db = o.Attach("users.db", "users_db");
-                using var tempTable = o.CreateTempTableFrom("TempSearchTerms", meteredSearchTokens);
-                return o.Query<Page>("PageSearch.sql", param).ToList();
-            });
-        }
-
-        public static List<Page> PageSearchPaged(List<string> searchTerms, int pageNumber, int? pageSize = null, bool? allowFuzzyMatching = null)
-        {
-            if (searchTerms.Count == 0)
-            {
-                return new List<Page>();
-            }
-
-            pageSize ??= GlobalConfiguration.PaginationSize;
-            allowFuzzyMatching ??= ConfigurationRepository.Get<bool>("Search", "Allow Fuzzy Matching");
-
-            var meteredSearchTokens = GetMeteredPageSearchTokens(searchTerms, allowFuzzyMatching == true);
-            if (meteredSearchTokens.Count == 0)
-            {
-                return new List<Page>();
-            }
-
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var param = new
-                {
-                    PageNumber = pageNumber,
-                    PageSize = pageSize,
-                    MaximumScore = meteredSearchTokens.Max(t => t.Score)
-                };
-
-                using var users_db = o.Attach("users.db", "users_db");
-                using var tempTable = o.CreateTempTableFrom("TempSearchTerms", meteredSearchTokens);
-                var results = o.Query<Page>("PageSearchPaged.sql", param).ToList();
-                return results;
-            });
-        }
-
-        public static List<RelatedPage> GetSimilarPagesPaged(int pageId, int similarity, int pageNumber, int? pageSize = null)
-        {
-            pageSize ??= GlobalConfiguration.PaginationSize;
-
-            var param = new
-            {
-                PageId = pageId,
-                Similarity = similarity,
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            };
-
-            return ManagedDataStorage.Pages.Query<RelatedPage>("GetSimilarPagesPaged.sql", param).ToList();
-        }
-
-        public static List<RelatedPage> GetRelatedPagesPaged(int pageId, int pageNumber, int? pageSize = null)
-        {
-            pageSize ??= GlobalConfiguration.PaginationSize;
-
-            var param = new
-            {
-                PageId = pageId,
-                PageNumber = pageNumber,
-                PageSize = pageSize
-            };
-
-            return ManagedDataStorage.Pages.Query<RelatedPage>("GetRelatedPagesPaged.sql", param).ToList();
-        }
+        public static List<ApiRelatedPage> GetRelatedPagesPaged(int pageId, int pageNumber, int? pageSize = null)
+            => Repo.GetRelatedPagesPaged(pageId, pageNumber, pageSize);
 
         public static void FlushPageCache(int pageId)
         {
@@ -281,788 +164,193 @@ namespace TightWiki.Repository
 
         public static void InsertPageComment(int pageId, Guid userId, string body)
         {
-            var param = new
-            {
-                PageId = pageId,
-                UserId = userId,
-                Body = body,
-                CreatedDate = DateTime.UtcNow
-            };
-
-            ManagedDataStorage.Pages.Execute("InsertPageComment.sql", param);
-
+            Repo.InsertPageComment(pageId, userId, body);
             FlushPageCache(pageId);
         }
 
         public static void DeletePageCommentById(int pageId, int commentId)
         {
-            var param = new
-            {
-                PageId = pageId,
-                CommentId = commentId
-            };
-
-            ManagedDataStorage.Pages.Execute("DeletePageCommentById.sql", param);
-
+            Repo.DeletePageCommentById(pageId, commentId);
             FlushPageCache(pageId);
         }
 
         public static void DeletePageCommentByUserAndId(int pageId, Guid userId, int commentId)
         {
-            var param = new
-            {
-                PageId = pageId,
-                UserId = userId,
-                CommentId = commentId
-            };
-
-            ManagedDataStorage.Pages.Execute("DeletePageCommentByUserAndId.sql", param);
-
+            Repo.DeletePageCommentByUserAndId(pageId, userId, commentId);
             FlushPageCache(pageId);
         }
 
-        public static List<PageComment> GetPageCommentsPaged(string navigation, int pageNumber)
+        public static List<ApiPageComment> GetPageCommentsPaged(string navigation, int pageNumber)
         {
             var cacheKey = WikiCacheKeyFunction.Build(WikiCache.Category.Page, [navigation, pageNumber, GlobalConfiguration.PaginationSize]);
-
-            return WikiCache.AddOrGet(cacheKey, () =>
-            {
-                var param = new
-                {
-                    Navigation = navigation,
-                    PageNumber = pageNumber,
-                    PageSize = GlobalConfiguration.PaginationSize
-                };
-
-                return ManagedDataStorage.Pages.Ephemeral(o =>
-                {
-                    using var users_db = o.Attach("users.db", "users_db");
-                    return o.Query<PageComment>("GetPageCommentsPaged.sql", param).ToList();
-                });
-            }).EnsureNotNull();
+            return WikiCache.AddOrGet(cacheKey, () => Repo.GetPageCommentsPaged(navigation, pageNumber)).EnsureNotNull();
         }
 
-        public static List<NonexistentPage> GetMissingPagesPaged(int pageNumber, string? orderBy = null, string? orderByDirection = null)
-        {
-            var param = new
-            {
-                PageNumber = pageNumber,
-                PageSize = GlobalConfiguration.PaginationSize
-            };
-
-            var query = RepositoryHelper.TransposeOrderby("GetMissingPagesPaged.sql", orderBy, orderByDirection);
-            return ManagedDataStorage.Pages.Query<NonexistentPage>(query, param).ToList();
-        }
+        public static List<ApiNonexistentPage> GetMissingPagesPaged(int pageNumber, string? orderBy = null, string? orderByDirection = null)
+            => Repo.GetMissingPagesPaged(pageNumber, orderBy, orderByDirection);
 
         public static void UpdateSinglePageReference(string pageNavigation, int pageId)
         {
-            var param = new
-            {
-                @PageId = pageId,
-                @PageNavigation = pageNavigation
-            };
-
-            ManagedDataStorage.Pages.Execute("UpdateSinglePageReference.sql", param);
-
+            Repo.UpdateSinglePageReference(pageNavigation, pageId);
             FlushPageCache(pageId);
         }
 
-        public static void UpdatePageReferences(int pageId, List<PageReference> referencesPageNavigations)
+        public static void UpdatePageReferences(int pageId, List<ApiPageReference> referencesPageNavigations)
         {
-            ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var param = new
-                {
-                    PageId = pageId
-                };
-
-                using var tempTable = o.CreateTempTableFrom("TempReferences", referencesPageNavigations.Distinct());
-                return o.Query<Page>("UpdatePageReferences.sql", param).ToList();
-            });
-
+            Repo.UpdatePageReferences(pageId, referencesPageNavigations);
             FlushPageCache(pageId);
         }
 
-        public static List<Page> GetAllPagesByInstructionPaged(int pageNumber, string? instruction = null)
-        {
-            var param = new
-            {
-                PageNumber = pageNumber,
-                PageSize = GlobalConfiguration.PaginationSize,
-                Instruction = instruction
-            };
-
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("users.db", "users_db");
-                return o.Query<Page>("GetAllPagesByInstructionPaged.sql", param).ToList();
-            });
-        }
+        public static List<ApiPage> GetAllPagesByInstructionPaged(int pageNumber, string? instruction = null)
+            => Repo.GetAllPagesByInstructionPaged(pageNumber, instruction);
 
         public static List<int> GetDeletedPageIdsByTokens(List<string>? tokens)
-        {
-            if (tokens == null || tokens.Count == 0)
-            {
-                return new List<int>();
-            }
-
-            return ManagedDataStorage.DeletedPages.Ephemeral(o =>
-            {
-                var param = new
-                {
-                    TokenCount = tokens.Count
-                };
-
-                using var tempTable = o.CreateTempTableFrom("TempTokens", tokens);
-                return o.Query<int>("GetDeletedPageIdsByTokens.sql", param).ToList();
-            });
-        }
+            => Repo.GetDeletedPageIdsByTokens(tokens);
 
         public static List<int> GetPageIdsByTokens(List<string>? tokens)
-        {
-            if (tokens == null || tokens.Count == 0)
-            {
-                return new List<int>();
-            }
+            => Repo.GetPageIdsByTokens(tokens);
 
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var param = new
-                {
-                    TokenCount = tokens.Count
-                };
-
-                using var tempTable = o.CreateTempTableFrom("TempTokens", tokens);
-                return o.Query<int>("GetPageIdsByTokens.sql", param).ToList();
-            });
-        }
-
-        public static List<Page> GetAllNamespacePagesPaged(int pageNumber, string namespaceName,
+        public static List<ApiPage> GetAllNamespacePagesPaged(int pageNumber, string namespaceName,
             string? orderBy = null, string? orderByDirection = null)
-        {
-            var param = new
-            {
-                PageNumber = pageNumber,
-                PageSize = GlobalConfiguration.PaginationSize,
-                Namespace = namespaceName
-            };
+            => Repo.GetAllNamespacePagesPaged(pageNumber, namespaceName, orderBy, orderByDirection);
 
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("users.db", "users_db");
-                var query = RepositoryHelper.TransposeOrderby("GetAllNamespacePagesPaged.sql", orderBy, orderByDirection);
-                return o.Query<Page>(query, param).ToList();
-            });
-        }
-
-        /// <summary>
-        /// Unlike the search, this method returns all pages and allows them to be paired down using the search terms.
-        /// Whereas the search requires a search term to get results. The matching here is also exact, no score based matching.
-        /// </summary>
-        public static List<Page> GetAllPagesPaged(int pageNumber,
+        public static List<ApiPage> GetAllPagesPaged(int pageNumber,
             string? orderBy = null, string? orderByDirection = null, List<string>? searchTerms = null)
-        {
-            var param = new
-            {
-                PageNumber = pageNumber,
-                PageSize = GlobalConfiguration.PaginationSize
-            };
+            => Repo.GetAllPagesPaged(pageNumber, orderBy, orderByDirection, searchTerms);
 
-            if (searchTerms?.Count > 0)
-            {
-                var pageIds = GetPageIdsByTokens(searchTerms);
-
-                return ManagedDataStorage.Pages.Ephemeral(o =>
-                {
-                    using var users_db = o.Attach("users.db", "users_db");
-                    using var deletedpagerevisions_db = o.Attach("deletedpagerevisions.db", "deletedpagerevisions_db");
-                    using var tempTable = o.CreateTempTableFrom("TempPageIds", pageIds);
-
-                    var query = RepositoryHelper.TransposeOrderby("GetAllPagesByPageIdPaged.sql", orderBy, orderByDirection);
-                    return o.Query<Page>(query, param).ToList();
-                });
-            }
-
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("users.db", "users_db");
-                using var deletedpagerevisions_db = o.Attach("deletedpagerevisions.db", "deletedpagerevisions_db");
-
-                var query = RepositoryHelper.TransposeOrderby("GetAllPagesPaged.sql", orderBy, orderByDirection);
-                return o.Query<Page>(query, param).ToList();
-            });
-        }
-
-        /// <summary>
-        /// Unlike the search, this method returns all pages and allows them to be paired down using the search terms.
-        /// Whereas the search requires a search term to get results. The matching here is also exact, no score based matching.
-        /// </summary>
-        public static List<Page> GetAllDeletedPagesPaged(int pageNumber, string? orderBy = null,
+        public static List<ApiPage> GetAllDeletedPagesPaged(int pageNumber, string? orderBy = null,
             string? orderByDirection = null, List<string>? searchTerms = null)
-        {
-            var param = new
-            {
-                PageNumber = pageNumber,
-                PageSize = GlobalConfiguration.PaginationSize
-            };
+            => Repo.GetAllDeletedPagesPaged(pageNumber, orderBy, orderByDirection, searchTerms);
 
-            if (searchTerms?.Count > 0)
-            {
-                var pageIds = GetDeletedPageIdsByTokens(searchTerms);
-                return ManagedDataStorage.DeletedPages.Ephemeral(o =>
-                {
-                    using var users_db = o.Attach("users.db", "users_db");
-                    using var tempTable = o.CreateTempTableFrom("TempPageIds", pageIds);
-
-                    var query = RepositoryHelper.TransposeOrderby("GetAllDeletedPagesByPageIdPaged.sql", orderBy, orderByDirection);
-                    return o.Query<Page>(query, param).ToList();
-                });
-            }
-
-            return ManagedDataStorage.DeletedPages.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("users.db", "users_db");
-                var query = RepositoryHelper.TransposeOrderby("GetAllDeletedPagesPaged.sql", orderBy, orderByDirection);
-                return o.Query<Page>(query, param).ToList();
-            });
-        }
-
-        public static List<NamespaceStat> GetAllNamespacesPaged(int pageNumber, string? orderBy = null, string? orderByDirection = null)
-        {
-            var param = new
-            {
-                PageNumber = pageNumber,
-                PageSize = GlobalConfiguration.PaginationSize
-            };
-
-            var query = RepositoryHelper.TransposeOrderby("GetAllNamespacesPaged.sql", orderBy, orderByDirection);
-
-            return ManagedDataStorage.Pages.Query<NamespaceStat>(query, param).ToList();
-        }
+        public static List<ApiNamespaceStat> GetAllNamespacesPaged(int pageNumber, string? orderBy = null, string? orderByDirection = null)
+            => Repo.GetAllNamespacesPaged(pageNumber, orderBy, orderByDirection);
 
         public static List<string> GetAllNamespaces()
-            => ManagedDataStorage.Pages.Query<string>("GetAllNamespaces.sql").ToList();
+            => Repo.GetAllNamespaces();
 
-        public static List<Page> GetAllPages()
-            => ManagedDataStorage.Pages.Query<Page>("GetAllPages.sql").ToList();
+        public static List<ApiPage> GetAllPages()
+            => Repo.GetAllPages();
 
-        public static List<Page> GetAllTemplatePages()
-            => ManagedDataStorage.Pages.Query<Page>("GetAllTemplatePages.sql").ToList();
+        public static List<ApiPage> GetAllTemplatePages()
+            => Repo.GetAllTemplatePages();
 
-        public static List<FeatureTemplate> GetAllFeatureTemplates()
+        public static List<ApiFeatureTemplate> GetAllFeatureTemplates()
             => WikiCache.AddOrGet(WikiCacheKeyFunction.Build(WikiCache.Category.Configuration), () =>
-                ManagedDataStorage.Pages.Query<FeatureTemplate>("GetAllFeatureTemplates.sql").ToList()).EnsureNotNull();
+                Repo.GetAllFeatureTemplates()).EnsureNotNull();
 
         public static void UpdatePageProcessingInstructions(int pageId, List<string> instructions)
         {
-            ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var param = new
-                {
-                    PageId = pageId
-                };
-
-                instructions = instructions.Select(o => o.ToLowerInvariant()).Distinct().ToList();
-
-                using var tempTable = o.CreateTempTableFrom("TempInstructions", instructions);
-                return o.Query<Page>("UpdatePageProcessingInstructions.sql", param).ToList();
-            });
-
+            Repo.UpdatePageProcessingInstructions(pageId, instructions);
             FlushPageCache(pageId);
         }
 
-        public static Page? GetPageRevisionById(int pageId, int? revision = null)
-        {
-            return WikiCache.AddOrGet(WikiCacheKeyFunction.Build(WikiCache.Category.Page, [pageId, revision]), () =>
-            {
-                var param = new
-                {
-                    PageId = pageId,
-                    Revision = revision
-                };
+        public static ApiPage? GetPageRevisionById(int pageId, int? revision = null)
+            => WikiCache.AddOrGet(WikiCacheKeyFunction.Build(WikiCache.Category.Page, [pageId, revision]), () =>
+                Repo.GetPageRevisionById(pageId, revision));
 
-                return ManagedDataStorage.Pages.QuerySingleOrDefault<Page>("GetPageRevisionById.sql", param);
-            });
-        }
-
-        public static void SavePageSearchTokens(List<PageToken> items)
-        {
-            ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                using var tempTable = o.CreateTempTableFrom("TempTokens", items.Distinct());
-                return o.Query<Page>("SavePageSearchTokens.sql").ToList();
-            });
-        }
+        public static void SavePageSearchTokens(List<ApiPageToken> items)
+            => Repo.SavePageSearchTokens(items);
 
         public static void TruncateAllPageRevisions(string confirm)
-        {
-            if (confirm != "YES") //Are you REALLY sure?
-            {
-                return;
-            }
-            else
-            {
-                ManagedDataStorage.Pages.Ephemeral(o =>
-                {
-                    var transaction = o.BeginTransaction();
-                    try
-                    {
-                        o.Execute("TruncateAllPageRevisions.sql");
-                        transaction.Commit();
-                    }
-                    catch
-                    {
-                        transaction.Rollback();
-                        throw;
-                    }
-                });
-            }
-        }
+            => Repo.TruncateAllPageRevisions(confirm);
 
         public static int GetCurrentPageRevision(int pageId)
-        {
-            return WikiCache.AddOrGet(WikiCacheKeyFunction.Build(WikiCache.Category.Page, [pageId]), () =>
-            {
-                var param = new
-                {
-                    PageId = pageId,
-                };
+            => WikiCache.AddOrGet(WikiCacheKeyFunction.Build(WikiCache.Category.Page, [pageId]), () =>
+                Repo.GetCurrentPageRevision(pageId));
 
-                return ManagedDataStorage.Pages.ExecuteScalar<int>("GetCurrentPageRevision.sql", param);
-            });
-        }
-
-        public static int GetCurrentPageRevision(SqliteManagedInstance connection, int pageId)
-        {
-            return WikiCache.AddOrGet(WikiCacheKeyFunction.Build(WikiCache.Category.Page, [pageId]), () =>
-            {
-                var param = new
-                {
-                    PageId = pageId,
-                };
-
-                return connection.ExecuteScalar<int>("GetCurrentPageRevision.sql", param);
-            });
-        }
-
-        public static Page? GetLimitedPageInfoByIdAndRevision(int pageId, int? revision = null)
+        public static ApiPage? GetLimitedPageInfoByIdAndRevision(int pageId, int? revision = null)
         {
             var cacheKey = WikiCacheKeyFunction.Build(WikiCache.Category.Page, [pageId, revision]);
-
-            return WikiCache.AddOrGet(cacheKey, () =>
-            {
-                var param = new
-                {
-                    PageId = pageId,
-                    Revision = revision
-                };
-
-                return ManagedDataStorage.Pages.QuerySingleOrDefault<Page>("GetLimitedPageInfoByIdAndRevision.sql", param);
-            });
+            return WikiCache.AddOrGet(cacheKey, () => Repo.GetLimitedPageInfoByIdAndRevision(pageId, revision));
         }
 
-        public static int SavePage(Page page)
-        {
-            var pageUpsertParam = new
-            {
-                PageId = page.Id,
-                Name = page.Name,
-                Navigation = NamespaceNavigation.CleanAndValidate(page.Name),
-                Description = page.Description,
-                Body = page.Body ?? string.Empty,
-                Namespace = page.Namespace,
-                CreatedByUserId = page.CreatedByUserId,
-                CreatedDate = page.CreatedDate,
-                ModifiedByUserId = page.ModifiedByUserId,
-                ModifiedDate = DateTime.UtcNow
-            };
+        public static int SavePage(ApiPage page)
+            => Repo.SavePage(page);
 
-            var newDataHash = Security.Helpers.Crc32(page.Body ?? string.Empty);
-
-            ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var transaction = o.BeginTransaction();
-
-                try
-                {
-                    int currentPageRevision = 0;
-                    bool hasPageChanged = false;
-
-                    if (page.Id == 0)
-                    {
-                        //This is a new page, just insert it.
-                        page.Id = o.ExecuteScalar<int>("CreatePage.sql", pageUpsertParam);
-                        hasPageChanged = true;
-                    }
-                    else
-                    {
-                        //Get current page so we can determine if anything has changed.
-                        var currentRevisionInfo = GetLimitedPageInfoByIdAndRevision(page.Id)
-                            ?? throw new Exception("The page could not be found.");
-
-                        currentPageRevision = currentRevisionInfo.Revision;
-
-                        //Update the existing page.
-                        o.Execute("UpdatePage.sql", pageUpsertParam);
-
-                        //Determine if anything has actually changed.
-                        hasPageChanged = currentRevisionInfo.Name != page.Name
-                            || currentRevisionInfo.Namespace != page.Namespace
-                            || currentRevisionInfo.Description != page.Description
-                            || currentRevisionInfo.ChangeSummary != page.ChangeSummary
-                            || currentRevisionInfo.DataHash != newDataHash;
-                    }
-
-                    if (hasPageChanged)
-                    {
-                        currentPageRevision++;
-
-                        var updatePageRevisionNumberParam = new
-                        {
-                            PageId = page.Id,
-                            PageRevision = currentPageRevision
-                        };
-                        //The page content has actually changed (according to the checksum), so we will bump the page revision.
-                        o.Execute("UpdatePageRevisionNumber.sql", updatePageRevisionNumberParam);
-
-                        var insertPageRevisionParam = new
-                        {
-                            PageId = page.Id,
-                            Name = page.Name,
-                            Namespace = page.Namespace,
-                            Description = page.Description,
-                            Body = page.Body,
-                            DataHash = newDataHash,
-                            PageRevision = currentPageRevision,
-                            ChangeSummary = page.ChangeSummary ?? string.Empty,
-                            ModifiedByUserId = page.ModifiedByUserId,
-                            ModifiedDate = DateTime.UtcNow,
-                        };
-                        //Insert the new actual page revision entry (this is the data).
-                        o.Execute("InsertPageRevision.sql", insertPageRevisionParam);
-
-                        var reassociateAllPageAttachmentsParam = new
-                        {
-                            PageId = page.Id,
-                            PageRevision = currentPageRevision,
-                        };
-                        //Associate all page attachments with the latest revision.
-                        o.Execute("ReassociateAllPageAttachments.sql", reassociateAllPageAttachmentsParam);
-                    }
-
-                    transaction.Commit();
-                }
-                catch
-                {
-                    transaction.Rollback();
-                    throw;
-                }
-            });
-
-            return page.Id;
-        }
-
-        /// <summary>
-        /// Gets the page info without the content.
-        /// </summary>
-        public static Page? GetPageInfoByNavigation(string navigation)
-        {
-            return WikiCache.AddOrGet(WikiCacheKeyFunction.Build(WikiCache.Category.Page, [navigation]), () =>
-            {
-                var param = new
-                {
-                    Navigation = navigation
-                };
-
-                return ManagedDataStorage.Pages.QuerySingleOrDefault<Page?>("GetPageInfoByNavigation.sql", param);
-            });
-        }
+        public static ApiPage? GetPageInfoByNavigation(string navigation)
+            => WikiCache.AddOrGet(WikiCacheKeyFunction.Build(WikiCache.Category.Page, [navigation]), () =>
+                Repo.GetPageInfoByNavigation(navigation));
 
         public static int GetPageRevisionCountByPageId(int pageId)
-        {
-            return WikiCache.AddOrGet(WikiCacheKeyFunction.Build(WikiCache.Category.Page, [pageId]), () =>
-            {
-                var param = new
-                {
-                    PageId = pageId
-                };
-
-                return ManagedDataStorage.Pages.ExecuteScalar<int>("GetPageRevisionCountByNavigation.sql", param);
-            });
-        }
+            => WikiCache.AddOrGet(WikiCacheKeyFunction.Build(WikiCache.Category.Page, [pageId]), () =>
+                Repo.GetPageRevisionCountByPageId(pageId));
 
         public static void RestoreDeletedPageByPageId(int pageId)
         {
-            var param = new
-            {
-                PageId = pageId
-            };
-
-            ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var transaction = o.BeginTransaction();
-                try
-                {
-                    using var deletedpages_db = o.Attach("deletedpages.db", "deletedpages_db");
-                    o.Execute("RestoreDeletedPageByPageId.sql", param);
-                    transaction.Commit();
-                }
-                catch
-                {
-                    transaction.Rollback();
-                    throw;
-                }
-            });
-
+            Repo.RestoreDeletedPageByPageId(pageId);
             FlushPageCache(pageId);
         }
 
         public static void MovePageRevisionToDeletedById(int pageId, int revision, Guid userId)
         {
-            var param = new
-            {
-                PageId = pageId,
-                Revision = revision,
-                DeletedByUserId = userId,
-                DeletedDate = DateTime.UtcNow
-            };
-
-            ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var transaction = o.BeginTransaction();
-                try
-                {
-                    using var deletedpagerevisions_db = o.Attach("deletedpagerevisions.db", "deletedpagerevisions_db");
-                    o.Execute("MovePageRevisionToDeletedById.sql", param);
-                    transaction.Commit();
-                }
-                catch
-                {
-                    transaction.Rollback();
-                    throw;
-                }
-            });
-
+            Repo.MovePageRevisionToDeletedById(pageId, revision, userId);
             FlushPageCache(pageId);
         }
 
         public static void MovePageToDeletedById(int pageId, Guid userId)
         {
-            var param = new
-            {
-                PageId = pageId,
-                DeletedByUserId = userId,
-                DeletedDate = DateTime.UtcNow
-            };
-
-            ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                var transaction = o.BeginTransaction();
-                try
-                {
-                    using var deletedpages_db = o.Attach("deletedpages.db", "deletedpages_db");
-
-                    o.Execute("MovePageToDeletedById.sql", param);
-                    transaction.Commit();
-                    ManagedDataStorage.Statistics.Execute("DeletePageStatisticsByPageId.sql", param);
-                }
-                catch
-                {
-                    transaction.Rollback();
-                    throw;
-                }
-            });
-
+            Repo.MovePageToDeletedById(pageId, userId);
             FlushPageCache(pageId);
         }
 
         public static void PurgeDeletedPageByPageId(int pageId)
         {
-            var param = new
-            {
-                PageId = pageId
-            };
-
-            ManagedDataStorage.DeletedPages.Execute("PurgeDeletedPageByPageId.sql", param);
-
-            PurgeDeletedPageRevisionsByPageId(pageId);
-
+            Repo.PurgeDeletedPageByPageId(pageId);
             FlushPageCache(pageId);
         }
 
         public static void PurgeDeletedPages()
-        {
-            ManagedDataStorage.DeletedPages.Execute("PurgeDeletedPages.sql");
-
-            PurgeDeletedPageRevisions();
-        }
+            => Repo.PurgeDeletedPages();
 
         public static int GetCountOfPageAttachmentsById(int pageId)
-        {
-            var param = new
-            {
-                PageId = pageId
-            };
+            => Repo.GetCountOfPageAttachmentsById(pageId);
 
-            return ManagedDataStorage.Pages.ExecuteScalar<int>("GetCountOfPageAttachmentsById.sql", param);
-        }
+        public static ApiPage? GetDeletedPageById(int pageId)
+            => Repo.GetDeletedPageById(pageId);
 
-        public static Page? GetDeletedPageById(int pageId)
-        {
-            var param = new
-            {
-                PageId = pageId
-            };
-
-            return ManagedDataStorage.DeletedPages.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("users.db", "users_db");
-                return o.QuerySingleOrDefault<Page>("GetDeletedPageById.sql", param);
-            });
-        }
-
-        public static Page? GetLatestPageRevisionById(int pageId)
-        {
-            var param = new
-            {
-                PageId = pageId
-            };
-
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("users.db", "users_db");
-                return o.QuerySingleOrDefault<Page>("GetLatestPageRevisionById.sql", param);
-            });
-        }
+        public static ApiPage? GetLatestPageRevisionById(int pageId)
+            => Repo.GetLatestPageRevisionById(pageId);
 
         public static int GetPageNextRevision(int pageId, int revision)
-        {
-            var param = new
-            {
-                PageId = pageId,
-                Revision = revision
-            };
-
-            return ManagedDataStorage.Pages.ExecuteScalar<int>("GetPageNextRevision.sql", param);
-        }
+            => Repo.GetPageNextRevision(pageId, revision);
 
         public static int GetPagePreviousRevision(int pageId, int revision)
-        {
-            var param = new
-            {
-                PageId = pageId,
-                Revision = revision
-            };
+            => Repo.GetPagePreviousRevision(pageId, revision);
 
-            return ManagedDataStorage.Pages.ExecuteScalar<int>("GetPagePreviousRevision.sql", param);
-        }
-
-        public static List<DeletedPageRevision> GetDeletedPageRevisionsByIdPaged(int pageId, int pageNumber,
+        public static List<ApiDeletedPageRevision> GetDeletedPageRevisionsByIdPaged(int pageId, int pageNumber,
             string? orderBy = null, string? orderByDirection = null)
-        {
-            var param = new
-            {
-                PageId = pageId,
-                PageNumber = pageNumber,
-                PageSize = GlobalConfiguration.PaginationSize
-            };
-
-            return ManagedDataStorage.DeletedPageRevisions.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("users.db", "users_db");
-
-                var query = RepositoryHelper.TransposeOrderby("GetDeletedPageRevisionsByIdPaged.sql", orderBy, orderByDirection);
-                return o.Query<DeletedPageRevision>(query, param).ToList();
-            });
-        }
+            => Repo.GetDeletedPageRevisionsByIdPaged(pageId, pageNumber, orderBy, orderByDirection);
 
         public static void PurgeDeletedPageRevisions()
-        {
-            ManagedDataStorage.DeletedPageRevisions.Execute("PurgeDeletedPageRevisions.sql");
-        }
+            => Repo.PurgeDeletedPageRevisions();
 
         public static void PurgeDeletedPageRevisionsByPageId(int pageId)
         {
-            var param = new
-            {
-                PageId = pageId
-            };
-
-            ManagedDataStorage.DeletedPageRevisions.Execute("PurgeDeletedPageRevisionsByPageId.sql", param);
-
+            Repo.PurgeDeletedPageRevisionsByPageId(pageId);
             FlushPageCache(pageId);
         }
 
         public static void PurgeDeletedPageRevisionByPageIdAndRevision(int pageId, int revision)
         {
-            var param = new
-            {
-                PageId = pageId,
-                Revision = revision
-            };
-
-            ManagedDataStorage.DeletedPageRevisions.Execute("PurgeDeletedPageRevisionByPageIdAndRevision.sql", param);
-
+            Repo.PurgeDeletedPageRevisionByPageIdAndRevision(pageId, revision);
             FlushPageCache(pageId);
         }
 
         public static void RestoreDeletedPageRevisionByPageIdAndRevision(int pageId, int revision)
         {
-            var param = new
-            {
-                PageId = pageId,
-                Revision = revision
-            };
-
-            ManagedDataStorage.DeletedPageRevisions.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("pages.db", "pages_db");
-                o.Execute("RestoreDeletedPageRevisionByPageIdAndRevision.sql", param);
-            });
-
+            Repo.RestoreDeletedPageRevisionByPageIdAndRevision(pageId, revision);
             FlushPageCache(pageId);
         }
 
-        public static DeletedPageRevision? GetDeletedPageRevisionById(int pageId, int revision)
-        {
-            var param = new
-            {
-                PageId = pageId,
-                Revision = revision
-            };
+        public static ApiDeletedPageRevision? GetDeletedPageRevisionById(int pageId, int revision)
+            => Repo.GetDeletedPageRevisionById(pageId, revision);
 
-            return ManagedDataStorage.DeletedPageRevisions.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("users.db", "users_db");
-                return o.Query<DeletedPageRevision>("GetDeletedPageRevisionById.sql", param).FirstOrDefault();
-            });
-        }
+        public static ApiPage? GetPageRevisionByNavigation(NamespaceNavigation navigation, int? revision = null)
+            => Repo.GetPageRevisionByNavigation(navigation, revision);
 
-        public static Page? GetPageRevisionByNavigation(NamespaceNavigation navigation, int? revision = null)
-        {
-            var param = new
-            {
-                Navigation = navigation.Canonical,
-                Revision = revision
-            };
-
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                using var users_db = o.Attach("users.db", "users_db");
-                return o.QuerySingleOrDefault<Page>("GetPageRevisionByNavigation.sql", param);
-            });
-        }
-
-        public static Page? GetPageRevisionByNavigation(string givenNavigation, int? revision = null, bool refreshCache = false)
+        public static ApiPage? GetPageRevisionByNavigation(string givenNavigation, int? revision = null, bool refreshCache = false)
         {
             var navigation = new NamespaceNavigation(givenNavigation);
-
-            var param = new
-            {
-                Navigation = navigation.Canonical,
-                Revision = revision
-            };
-
             var cacheKey = WikiCacheKeyFunction.Build(WikiCache.Category.Page, [navigation.Canonical, revision]);
 
             if (refreshCache)
@@ -1070,73 +358,22 @@ namespace TightWiki.Repository
                 WikiCache.Remove(cacheKey);
             }
 
-            return WikiCache.AddOrGet(cacheKey, () =>
-                {
-                    return ManagedDataStorage.Pages.Ephemeral(o =>
-                    {
-                        using var users_db = o.Attach("users.db", "users_db");
-                        return o.QuerySingleOrDefault<Page>("GetPageRevisionByNavigation.sql", param);
-                    });
-                });
-
+            return WikiCache.AddOrGet(cacheKey, () => Repo.GetPageRevisionByNavigation(givenNavigation, revision, false));
         }
 
-        #region Tags.
+        public static List<ApiTagAssociation> GetAssociatedTags(string tag)
+            => Repo.GetAssociatedTags(tag);
 
-        public static List<TagAssociation> GetAssociatedTags(string tag)
-        {
-            var param = new
-            {
-                @Tag = tag
-            };
+        public static List<ApiPage> GetPageInfoByNamespaces(List<string> namespaces)
+            => Repo.GetPageInfoByNamespaces(namespaces);
 
-            return ManagedDataStorage.Pages.Query<TagAssociation>("GetAssociatedTags.sql", param).ToList();
-        }
+        public static List<ApiPage> GetPageInfoByTags(List<string> tags)
+            => Repo.GetPageInfoByTags(tags);
 
-        public static List<Page> GetPageInfoByNamespaces(List<string> namespaces)
-        {
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                using var tempTable = o.CreateTempTableFrom("TempNamespaces", namespaces);
-                return o.Query<Page>("GetPageInfoByNamespaces.sql").ToList();
-            });
-        }
-
-        public static List<Page> GetPageInfoByTags(List<string> tags)
-        {
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                using var tempTable = o.CreateTempTableFrom("TempTags", tags);
-                return o.Query<Page>("GetPageInfoByTags.sql").ToList();
-            });
-        }
-
-        public static List<Page> GetPageInfoByTag(string tag)
-        {
-            return ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                using var tempTable = o.CreateTempTableFrom("TempTags", new List<string> { tag });
-                return o.Query<Page>("GetPageInfoByTags.sql").ToList();
-            });
-        }
+        public static List<ApiPage> GetPageInfoByTag(string tag)
+            => Repo.GetPageInfoByTag(tag);
 
         public static void UpdatePageTags(int pageId, List<string> tags)
-        {
-            ManagedDataStorage.Pages.Ephemeral(o =>
-            {
-                tags = tags.Select(o => o.ToLowerInvariant()).Distinct().ToList();
-
-                using var tempTable = o.CreateTempTableFrom("TempTags", tags);
-
-                var param = new
-                {
-                    PageId = pageId
-                };
-
-                return o.Query<Page>("UpdatePageTags.sql", param).ToList();
-            });
-        }
-
-        #endregion
+            => Repo.UpdatePageTags(pageId, tags);
     }
 }
