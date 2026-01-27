@@ -1,4 +1,4 @@
-﻿namespace GenerateSeedData
+namespace GenerateSeedData
 {
     public class Theme
     {

@@ -31,19 +31,20 @@
 
   <ItemGroup>
     <PackageReference Include="Autofac.Extensions.DependencyInjection" />
+    <PackageReference Include="Dapper" />
     <PackageReference Include="Magick.NET-Q8-AnyCPU" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
-    <PackageReference Include="Microsoft.EntityFrameworkCore.Sqlite" />
     <PackageReference Include="Microsoft.Extensions.Hosting" />
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
     <PackageReference Include="NTDLS.DelegateThreadPooling" />
+    <PackageReference Include="NTDLS.SqliteDapperWrapper" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\DAL\DAL.csproj" />
-    <ProjectReference Include="..\TightWiki.Engine\TightWiki.Engine.csproj" />
-    <ProjectReference Include="..\TightWiki.Engine.Implementation\TightWiki.Engine.Implementation.csproj" />
-    <ProjectReference Include="..\TightWiki.Models\TightWiki.Models.csproj" />
-    <ProjectReference Include="..\TightWiki.Repository\TightWiki.Repository.csproj" />
+    <ProjectReference Include="..\TightWiki.Application\TightWiki.Application.csproj" />
+    <ProjectReference Include="..\TightWiki.Infrastructure\TightWiki.Infrastructure.csproj" />
+    <ProjectReference Include="..\TightWiki.Web.Engine\TightWiki.Web.Engine.csproj" />
+    <ProjectReference Include="..\TightWiki.Utils\TightWiki.Utils.csproj" />
   </ItemGroup>
 
 </Project>

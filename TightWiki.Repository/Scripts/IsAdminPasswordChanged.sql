@@ -1,4 +1,0 @@
-SELECT
-	Value
-FROM
-	AdminPwCheck

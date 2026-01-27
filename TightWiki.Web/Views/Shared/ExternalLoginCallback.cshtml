@@ -1,0 +1,10 @@
+﻿@model TightWiki.Web.Bff.ViewModels.ExternalLoginCallbackViewModel
+
+<div class="card shadow-lg">
+    <div class="card-header">
+        <h3>External Login Exception</h3>
+    </div>
+    <div class="card-body">
+        <div class="alert alert-danger">@Html.Raw(Model.ErrorMessage)</div>
+    </div>
+</div>

@@ -1,19 +1,26 @@
-﻿using Microsoft.AspNetCore.Identity;
+using BLL.Services.Configuration;
+using BLL.Services.Pages;
+using BLL.Services.PageFile;
+using BLL.Services.Security;
+using BLL.Services.Users;
+using Microsoft.AspNetCore.Identity;
 using NTDLS.Helpers;
 using System.Security.Claims;
 using System.Text;
-using TightWiki.Engine.Library.Interfaces;
-using TightWiki.Library;
-using TightWiki.Models;
-using TightWiki.Models.DataModels;
-using TightWiki.Repository;
+using TightWiki.Contracts;
+using TightWiki.Contracts.DataModels;
+using TightWiki.Web.Engine.Library.Interfaces;
+using TightWiki.Utils;
+
+// Type alias to disambiguate from BLL.Services.Page namespace
+using ContractsPage = TightWiki.Contracts.DataModels.Page;
 
 namespace DummyPageGenerator
 {
     internal class PageGenerator
     {
         private readonly object _lockObject = new();
-        private List<Page> _pagePool;
+        private List<ContractsPage> _pagePool;
         private readonly Random _random;
         private readonly List<string> _namespaces;
         private readonly List<string> _tags;
@@ -22,25 +29,43 @@ namespace DummyPageGenerator
         private readonly UserManager<IdentityUser> _userManager;
         private readonly List<AccountProfile> _users;
 
+        // BLL Services
+        private readonly IPageService _pageService;
+        private readonly IUsersService _usersService;
+        private readonly IConfigurationService _configurationService;
+        private readonly ISecurityService _securityService;
+        private readonly IPageFileService _pageFileService;
+
         public List<AccountProfile> Users => _users;
         public Random Random => _random;
 
-        public PageGenerator(UserManager<IdentityUser> userManager)
+        public PageGenerator(
+            UserManager<IdentityUser> userManager,
+            IPageService pageService,
+            IUsersService usersService,
+            IConfigurationService configurationService,
+            ISecurityService securityService,
+            IPageFileService pageFileService)
         {
             _userManager = userManager;
+            _pageService = pageService;
+            _usersService = usersService;
+            _configurationService = configurationService;
+            _securityService = securityService;
+            _pageFileService = pageFileService;
             _random = new Random();
 
-            _namespaces = PageRepository.GetAllNamespaces();
+            _namespaces = _pageService.GetAllNamespaces();
             _tags = WordsRepository.GetRandomWords(250);
             _fileNames = WordsRepository.GetRandomWords(50);
-            _pagePool = PageRepository.GetAllPages();
+            _pagePool = _pageService.GetAllPages();
 
             if (_namespaces.Count < 250)
             {
                 _namespaces.AddRange(WordsRepository.GetRandomWords(250));
             }
 
-            _users = UsersRepository.GetAllUsers();
+            _users = _usersService.GetAllUsers();
 
             if (_users.Count < 1124)
             {
@@ -50,16 +75,16 @@ namespace DummyPageGenerator
                     CreateUserAndProfile(emailAddress);
                 }
 
-                _users = UsersRepository.GetAllUsers();
+                _users = _usersService.GetAllUsers();
             }
         }
 
-        public static string GetRandomUnusedAccountName()
+        public string GetRandomUnusedAccountName()
         {
             while (true)
             {
                 var randomAccountName = string.Join(" ", WordsRepository.GetRandomWords(2));
-                if (UsersRepository.DoesProfileAccountExist(Navigation.Clean(randomAccountName)) == false)
+                if (_usersService.DoesProfileAccountExist(Navigation.Clean(randomAccountName)) == false)
                 {
                     return randomAccountName;
                 }
@@ -84,19 +109,19 @@ namespace DummyPageGenerator
             }
 
             var userId = _userManager.GetUserIdAsync(user).Result;
-            var membershipConfig = ConfigurationRepository.GetConfigurationEntryValuesByGroupName(Constants.ConfigurationGroup.Membership);
+            var membershipConfig = _configurationService.GetConfigurationEntriesByGroupName(Constants.ConfigurationGroup.Membership);
 
-            UsersRepository.CreateProfile(Guid.Parse(userId), GetRandomUnusedAccountName());
+            _usersService.CreateProfile(Guid.Parse(userId), GetRandomUnusedAccountName());
 
             var claimsToAdd = new List<Claim>
                     {
-                        new (ClaimTypes.Role, membershipConfig.Value<string>("Default Signup Role").EnsureNotNull()),
-                        new ("timezone", membershipConfig.Value<string>("Default TimeZone").EnsureNotNull()),
-                        new (ClaimTypes.Country, membershipConfig.Value<string>("Default Country").EnsureNotNull()),
-                        new ("language", membershipConfig.Value<string>("Default Language").EnsureNotNull()),
+                        new Claim(ClaimTypes.Role, membershipConfig.Value<string>("Default Signup Role").EnsureNotNull()),
+                        new Claim("timezone", membershipConfig.Value<string>("Default TimeZone").EnsureNotNull()),
+                        new Claim(ClaimTypes.Country, membershipConfig.Value<string>("Default Country").EnsureNotNull()),
+                        new Claim("language", membershipConfig.Value<string>("Default Language").EnsureNotNull()),
                     };
 
-            SecurityRepository.UpsertUserClaims(_userManager, user, claimsToAdd);
+            _securityService.UpsertUserClaims(_userManager, user, claimsToAdd);
         }
 
         /// <summary>
@@ -194,8 +219,11 @@ namespace DummyPageGenerator
         /// <summary>
         /// Creates a random page on the wiki.
         /// </summary>
-        /// <param name="userId"></param>
-        public void GeneratePage(ITightEngine engine, Guid userId)
+        /// <param name="engine">The wiki engine</param>
+        /// <param name="config">Engine configuration</param>
+        /// <param name="dataProvider">Engine data provider</param>
+        /// <param name="userId">The user ID</param>
+        public void GeneratePage(ITightEngine engine, IEngineConfiguration config, IEngineDataProvider dataProvider, Guid userId)
         {
             try
             {
@@ -237,17 +265,31 @@ namespace DummyPageGenerator
                 body.AppendLine($"##related");
                 body.AppendLine("\r\n");
 
-                var page = new Page()
+                // Create EnginePage for the Engine layer
+                var enginePage = new EnginePage()
                 {
+                    Name = pageName,
+                    Body = body.ToString(),
+                    CreatedDate = DateTime.UtcNow,
+                    ModifiedDate = DateTime.UtcNow,
+                    Description = string.Join(' ', WordsRepository.GetRandomWords(_random.Next(3, 5))),
+                    Navigation = NamespaceNavigation.CleanAndValidate(pageName)
+                };
+                int newPageId = TightWiki.Web.Engine.Helpers.UpsertPage(engine, config, dataProvider, enginePage);
+
+                // Also create Page for the pool
+                var page = new ContractsPage()
+                {
+                    Id = newPageId,
                     Name = pageName,
                     Body = body.ToString(),
                     CreatedByUserId = userId,
                     ModifiedByUserId = userId,
                     CreatedDate = DateTime.UtcNow,
                     ModifiedDate = DateTime.UtcNow,
-                    Description = string.Join(' ', WordsRepository.GetRandomWords(_random.Next(3, 5))),
+                    Description = enginePage.Description,
+                    Navigation = enginePage.Navigation
                 };
-                int newPageId = TightWiki.Engine.Implementation.Helpers.UpsertPage(engine, page);
 
                 if (_random.Next(100) >= 70)
                 {
@@ -264,7 +306,7 @@ namespace DummyPageGenerator
             }
         }
 
-        private Page GetRandomPage()
+        private ContractsPage GetRandomPage()
         {
             lock (_pagePool)
             {
@@ -272,7 +314,7 @@ namespace DummyPageGenerator
             }
         }
 
-        private void InsertPagePool(Page page)
+        private void InsertPagePool(ContractsPage page)
         {
             lock (_pagePool)
             {
@@ -283,8 +325,11 @@ namespace DummyPageGenerator
         /// <summary>
         /// Modifies a random page on the wiki.
         /// </summary>
-        /// <param name="userId"></param>
-        public void ModifyRandomPages(ITightEngine engine, Guid userId)
+        /// <param name="engine">The wiki engine</param>
+        /// <param name="config">Engine configuration</param>
+        /// <param name="dataProvider">Engine data provider</param>
+        /// <param name="userId">The user ID</param>
+        public void ModifyRandomPages(ITightEngine engine, IEngineConfiguration config, IEngineDataProvider dataProvider, Guid userId)
         {
             var pageToModify = GetRandomPage();
 
@@ -309,7 +354,21 @@ namespace DummyPageGenerator
                     + "\r\n" + bottomText.Trim();
                 pageToModify.ModifiedByUserId = userId;
                 pageToModify.ModifiedByUserId = userId;
-                TightWiki.Engine.Implementation.Helpers.UpsertPage(engine, pageToModify);
+
+                // Convert to EnginePage for the Engine layer
+                var enginePage = new EnginePage()
+                {
+                    Id = pageToModify.Id,
+                    Name = pageToModify.Name,
+                    Body = pageToModify.Body,
+                    Navigation = pageToModify.Navigation,
+                    Description = pageToModify.Description,
+                    CreatedDate = pageToModify.CreatedDate,
+                    ModifiedDate = DateTime.UtcNow,
+                    Revision = pageToModify.Revision,
+                    MostCurrentRevision = pageToModify.MostCurrentRevision
+                };
+                TightWiki.Web.Engine.Helpers.UpsertPage(engine, config, dataProvider, enginePage);
 
                 if (_random.Next(100) >= 90)
                 {
@@ -334,7 +393,7 @@ namespace DummyPageGenerator
                 throw new Exception("Could not save the attached file, too large");
             }
 
-            PageFileRepository.UpsertPageFile(new PageFileAttachment()
+            _pageFileService.UpsertPageFile(new PageFileAttachment()
             {
                 Data = fileData,
                 CreatedDate = DateTime.UtcNow,

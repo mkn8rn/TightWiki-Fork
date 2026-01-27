@@ -3,11 +3,13 @@
 This project is based on TightWiki (MIT). Original code remains MIT licensed; my modifications are AGPL-3.0.
 Link to the original: https://github.com/NTDLS/TightWiki
 
-Personal objectives are to migrate this to PostgreSQL + EFC with a Traditional Architecture paradigm. Why? I don't know. I decided it would be a fun idea. I'm also privately using it as an example of refactoring a project to a new tech stack and architecture paradigm.
-Currently WiP, do not use. I'm still figuring out the best way to go about this. The repositories are currently a hackjobbed abomination and will likely be removed entirely, I just needed to get something working in Postgres first.
+Originally a spur of the moment thing, I'm currently this fork educationally for teaching software architecture concepts to a private community, notably traditional architecture and backend for frontend (BFF) patterns. This fork is not KISS compliant nor should you expect that given my goal. Futhermore, it is not considered production ready, nor should you expect that either.
 
-## EF Core migrations (DAL)
+The current project structure makes sense when you are building a platform rather than an app: when you have multiple fundamentally different clients, non-trivial domain logic that must be centralized, and a need for clean, long-term separation between presentation concerns and core behavior. Does this project need all of these things? No. 
 
-In Visual Studio Package Manager Console set Default project to `DAL`, then run: `Import-Module (Join-Path (Get-Location) 'DAL\addmig.psm1') -Force`.
-Use `addmig Identity <MigrationName>` / `addmig Wiki <MigrationName>` to create migrations and `updb Identity` / `updb Wiki` to apply them.
-Any other value is passed through as the exact EF `-Context` name.
+A fork was more convenient than creating a whole project from scratch. A real full featured platform requires a full featured platform workload... 
+
+The community is on Matrix, and you, the reader, may join. Private rooms are for contributors or paying members; public rooms do not require involvement beyond being respectful and following the code of conduct, but are also largely inactive at this time.
+
+Public rooms space: https://matrix.to/#/#p1:matrix.mkn8rn.com
+Private rooms space: https://matrix.to/#/#s1:matrix.mkn8rn.com

@@ -1,0 +1,74 @@
+﻿ 
+@inject IViewLocalizer Localizer
+@model TightWiki.Web.Bff.ViewModels.Profile.PublicViewModel
+@{
+    Layout = "_Layout";
+}
+
+<table class="fixedTable100" border="0" cellpadding="5">
+    <tbody>
+        <tr>
+            <td height="52" valign="middle" align="left">
+                @if (string.IsNullOrWhiteSpace(Model.Navigation) == false)
+                {
+                    <table border="0">
+                        <tr class="padded">
+                            <td><img src="/Profile/@Model.Navigation/Avatar?max=150" /></td>
+                            <td>&nbsp;</td>
+                        </tr>
+                        <tr><td colspan="2"><div class="text-danger">@Html.ValidationMessageFor(m => m.AccountName)</div></td></tr>
+                        <tr class="padded">
+                            <td><strong>@Localizer["Name"]</strong></td>
+                            <td>@Html.DisplayFor(m => m.AccountName)</td>
+                        </tr>
+                        <tr><td colspan="2"><div class="text-danger">@Html.ValidationMessageFor(m => m.Country)</div></td></tr>
+                        <tr class="padded">
+                            <td><strong>@Localizer["Country"]</strong></td>
+                            <td>@Html.DisplayFor(m => m.Country)</td>
+                        </tr>
+                        <tr><td colspan="2"><div class="text-danger">@Html.ValidationMessageFor(m => m.Language)</div></td></tr>
+                        <tr class="padded">
+                            <td><strong>@Localizer["Language"]</strong></td>
+                            <td>@Html.DisplayFor(m => m.Language)</td>
+                        </tr>
+                        <tr><td colspan="2"><div class="text-danger">@Html.ValidationMessageFor(m => m.TimeZone)</div></td></tr>
+                        <tr class="padded">
+                            <td><strong>@Localizer["Time Zone"]</strong></td>
+                            <td>@Html.DisplayFor(m => m.TimeZone)</td>
+                        </tr>
+                        <tr><td colspan="2"><div class="text-danger">@Html.ValidationMessageFor(m => m.Biography)</div></td></tr>
+                        <tr class="padded">
+                            <td><strong>@Localizer["Biography"]</strong></td>
+                            <td><div style="word-wrap: break-word;">@Html.Raw(Model.Biography)</div></td>
+                        </tr>
+                    </table>
+                }
+
+                @if (Model.RecentlyModified.Count > 0)
+                {
+                    <hr class="mt-5 mb-5">
+                    <h2>Recently Modified</h2>
+                    <table class="table fixedTable100 table-striped" border="0" cellspacing="0" cellpadding="0">
+                        <thead>
+                            <tr>
+                                <td><strong>Page</strong></td>
+                                <td><strong>Modified</strong></td>
+                                <td><strong>Analysis</strong></td>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach (var h in Model.RecentlyModified)
+                            {
+                                <tr>
+                                    <td><a href="@GlobalConfiguration.BasePath/@h.Navigation">@Html.DisplayTextFor(x => h.Name)</a></td>
+                                    <td>@Html.DisplayTextFor(x => h.ModifiedDate)</td>
+                                    <td>@Html.DisplayTextFor(x => h.ChangeAnalysis)</td>
+                                </tr>
+                            }
+                        </tbody>
+                    </table>
+                }
+            </td>
+        </tr>
+    </tbody>
+</table>

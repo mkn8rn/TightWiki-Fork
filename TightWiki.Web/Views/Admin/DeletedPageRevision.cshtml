@@ -1,0 +1,25 @@
+ 
+@inject IViewLocalizer Localizer
+@model TightWiki.Web.Bff.ViewModels.Page.DeletedPageRevisionViewModel
+@{
+    Layout = "_Layout";
+    var sessionState = ViewData["SessionState"] as TightWiki.SessionState ?? throw new Exception("Wiki State Context cannot be null.");
+}
+
+<div class="card shadow-lg border-warning mb-3">
+    <div class="card-header bg-warning">
+        <strong>@Localizer["Viewing a deleted page revision"]</strong>
+    </div>
+    <div class="card-body">
+        <p class="card-text">
+            @Localizer.Format("You are viewing a page revision which was deleted on {0} by {1}.", Model.DeletedDate, Model.DeletedByUserName)<br />
+
+            @ConfirmActionHelper.GenerateWarnButton(GlobalConfiguration.BasePath,
+                Localizer["This will restore the deleted page and all of its history. Continue?"].Value,
+                Localizer["Restore This Revision"].Value, $"/Admin/RestoreDeletedPageRevision/{Model.PageId}/{Model.Revision}", "/Admin/DeletedPageRevisions", Context.Request.Path.Value)
+            <br />
+        </p>
+    </div>
+</div>
+
+@Html.Raw(Model.Body)

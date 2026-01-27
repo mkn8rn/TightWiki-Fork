@@ -1,0 +1,13 @@
+namespace DAL.Models
+{
+    public class EmojiDB
+    {
+        public int Id { get; set; }
+        public string Name { get; set; } = string.Empty;
+        public string Shortcut { get; set; } = string.Empty;
+        public int PaginationPageCount { get; set; }
+        public string Categories { get; set; } = string.Empty;
+        public byte[]? ImageData { get; set; }
+        public string MimeType { get; set; } = string.Empty;
+    }
+}

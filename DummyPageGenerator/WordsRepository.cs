@@ -1,4 +1,4 @@
-﻿using NTDLS.SqliteDapperWrapper;
+using NTDLS.SqliteDapperWrapper;
 
 namespace DummyPageGenerator
 {

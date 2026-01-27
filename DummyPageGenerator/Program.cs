@@ -1,4 +1,4 @@
-﻿using Autofac;
+using Autofac;
 using Autofac.Extensions.DependencyInjection;
 using Dapper;
 using Microsoft.AspNetCore.Identity;
@@ -8,13 +8,21 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using NTDLS.DelegateThreadPooling;
-using TightWiki.Engine;
-using TightWiki.Engine.Implementation;
-using TightWiki.Engine.Implementation.Handlers;
-using TightWiki.Engine.Library.Interfaces;
+using TightWiki.Web.Engine;
+using TightWiki.Web.Engine.Handlers;
+using TightWiki.Web.Engine.Library.Interfaces;
 using DAL;
-using TightWiki.Library;
-using TightWiki.Repository;
+using TightWiki.Utils;
+using BLL.Services.Configuration;
+using BLL.Services.Emojis;
+using BLL.Services.Engine;
+using BLL.Services.Exception;
+using BLL.Services.Pages;
+using BLL.Services.PageFile;
+using BLL.Services.Security;
+using BLL.Services.Spanned;
+using BLL.Services.Statistics;
+using BLL.Services.Users;
 
 namespace DummyPageGenerator
 {
@@ -27,15 +35,57 @@ namespace DummyPageGenerator
             }
         }
 
+        public class NoOpExceptionHandler : IExceptionHandler
+        {
+            public void Log(ITightEngineState state, System.Exception? ex, string customText)
+            {
+            }
+        }
+
         static void Main(string[] args)
         {
             SqlMapper.AddTypeHandler(new GuidTypeHandler());
+
+            const string postgresConnectionString = "Host=localhost;Port=5432;Database=tightwiki_db;Username=postgres;Password=123456";
 
             var host = Host.CreateDefaultBuilder(args)
                        .ConfigureAppConfiguration((context, config) =>
                        {
                            config.SetBasePath(AppContext.BaseDirectory)
                                  .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true);
+                       })
+                       .ConfigureServices((context, services) =>
+                       {
+                           // Register PostgreSQL DbContexts
+                           services.AddDbContext<WikiDbContext>(options =>
+                               options.UseNpgsql(postgresConnectionString));
+
+                           services.AddDbContext<IdentityDbContext>(options =>
+                               options.UseNpgsql(postgresConnectionString));
+
+                           // Register BLL Services (same as main application)
+                           services.AddScoped<IConfigurationService, ConfigurationService>();
+                           services.AddScoped<IEmojiService, EmojiService>();
+                           services.AddScoped<IExceptionService, ExceptionService>();
+                           services.AddScoped<IPageService, PageService>();
+                           services.AddScoped<IPageFileService, PageFileService>();
+                           services.AddScoped<ISecurityService, SecurityService>();
+                           services.AddScoped<ISpannedService, SpannedService>();
+                           services.AddScoped<IStatisticsService, StatisticsService>();
+                           services.AddScoped<IUsersService, UsersService>();
+
+                           // Register IEngineDataProvider (bridge between BLL and Engine)
+                           services.AddScoped<IEngineDataProvider, EngineDataProvider>();
+
+                           // Register Identity services
+                           services.AddIdentity<IdentityUser, IdentityRole>()
+                                   .AddEntityFrameworkStores<IdentityDbContext>()
+                                   .AddDefaultTokenProviders();
+
+                           // Register PageGenerator
+                           services.AddScoped<PageGenerator>();
+
+                           services.AddLogging(configure => configure.AddConsole());
                        })
                        .UseServiceProviderFactory(new AutofacServiceProviderFactory())
                        .ConfigureContainer<ContainerBuilder>(containerBuilder =>
@@ -50,68 +100,57 @@ namespace DummyPageGenerator
                            containerBuilder.RegisterType<EmojiHandler>().As<IEmojiHandler>().SingleInstance();
                            containerBuilder.RegisterType<ExternalLinkHandler>().As<IExternalLinkHandler>().SingleInstance();
                            containerBuilder.RegisterType<InternalLinkHandler>().As<IInternalLinkHandler>().SingleInstance();
-                           containerBuilder.RegisterType<ExceptionHandler>().As<IExceptionHandler>().SingleInstance();
+                           containerBuilder.RegisterType<NoOpExceptionHandler>().As<IExceptionHandler>().SingleInstance();
                            containerBuilder.RegisterType<NoOpCompletionHandler>().As<ICompletionHandler>().SingleInstance();
 
-                           containerBuilder.RegisterType<TightEngine>();
+                           containerBuilder.RegisterType<TightEngine>().As<ITightEngine>();
                        }).Build();
 
+            // Load configuration into GlobalConfiguration
+            using (var initScope = host.Services.CreateScope())
+            {
+                var configService = initScope.ServiceProvider.GetRequiredService<IConfigurationService>();
+                configService.ReloadAllConfiguration();
 
-            var configuration = host.Services.GetRequiredService<IConfiguration>();
-            var services = new ServiceCollection();
-
-            services.AddLogging(configure => configure.AddConsole());
-
-            services.AddDbContext<IdentityDbContext>(options =>
-                options.UseSqlite(configuration.GetConnectionString("UsersConnection")));
-
-            ManagedDataStorage.Pages.SetConnectionString(configuration.GetConnectionString("PagesConnection"));
-            ManagedDataStorage.DeletedPages.SetConnectionString(configuration.GetConnectionString("DeletedPagesConnection"));
-            ManagedDataStorage.DeletedPageRevisions.SetConnectionString(configuration.GetConnectionString("DeletedPageRevisionsConnection"));
-            ManagedDataStorage.Statistics.SetConnectionString(configuration.GetConnectionString("StatisticsConnection"));
-            ManagedDataStorage.Emoji.SetConnectionString(configuration.GetConnectionString("EmojiConnection"));
-            ManagedDataStorage.Exceptions.SetConnectionString(configuration.GetConnectionString("ExceptionsConnection"));
-            WordsRepository.Words.SetConnectionString(configuration.GetConnectionString("WordsConnection"));
-            ManagedDataStorage.Users.SetConnectionString(configuration.GetConnectionString("UsersConnection"));
-            ManagedDataStorage.Config.SetConnectionString(configuration.GetConnectionString("ConfigConnection"));
-
-            // Register Identity services
-            services.AddIdentity<IdentityUser, IdentityRole>()
-                    .AddEntityFrameworkStores<IdentityDbContext>()
-                    .AddDefaultTokenProviders();
-
-            var serviceProvider = services.BuildServiceProvider();
-
-            // Resolve the services
-            var signInManager = serviceProvider.GetRequiredService<SignInManager<IdentityUser>>();
-            var userManager = serviceProvider.GetRequiredService<UserManager<IdentityUser>>();
-            var userStore = serviceProvider.GetRequiredService<IUserStore<IdentityUser>>();
-
-            ConfigurationRepository.ReloadEverything();
-
-            var pg = new PageGenerator(userManager);
+                var emojiService = initScope.ServiceProvider.GetRequiredService<IEmojiService>();
+                emojiService.ReloadEmojisCache();
+            }
 
             var pool = new DelegateThreadPool();
 
             while (true)
             {
+                using var scope = host.Services.CreateScope();
+                var pg = scope.ServiceProvider.GetRequiredService<PageGenerator>();
+
                 var workload = pool.CreateChildPool();
 
                 foreach (var user in pg.Users)
                 {
                     workload.Enqueue(() =>
                     {
-                        using var scope = host.Services.CreateScope();
-                        var engine = scope.ServiceProvider.GetRequiredService<TightEngine>();
+                        using var innerScope = host.Services.CreateScope();
+                        var engine = innerScope.ServiceProvider.GetRequiredService<ITightEngine>();
+                        var dataProvider = innerScope.ServiceProvider.GetRequiredService<IEngineDataProvider>();
+                        var innerPg = innerScope.ServiceProvider.GetRequiredService<PageGenerator>();
+
+                        var config = new TightWiki.Contracts.EngineConfiguration
+                        {
+                            BasePath = TightWiki.Contracts.GlobalConfiguration.BasePath,
+                            SiteName = TightWiki.Contracts.GlobalConfiguration.Name,
+                            RecordCompilationMetrics = TightWiki.Contracts.GlobalConfiguration.RecordCompilationMetrics,
+                            EnablePublicProfiles = TightWiki.Contracts.GlobalConfiguration.EnablePublicProfiles,
+                            Emojis = TightWiki.Contracts.GlobalConfiguration.Emojis
+                        };
 
                         //Create a new page:
-                        pg.GeneratePage(engine, user.UserId);
+                        innerPg.GeneratePage(engine, config, dataProvider, user.UserId);
 
                         //Modify existing pages:
-                        int modifications = pg.Random.Next(0, 10);
+                        int modifications = innerPg.Random.Next(0, 10);
                         for (int i = 0; i < modifications; i++)
                         {
-                            pg.ModifyRandomPages(engine, user.UserId);
+                            innerPg.ModifyRandomPages(engine, config, dataProvider, user.UserId);
                         }
                     });
                 }

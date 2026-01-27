@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="DiffPlex" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\TightWiki.Contracts\TightWiki.Contracts.csproj" />
+    <ProjectReference Include="..\TightWiki.Application\TightWiki.Application.csproj" />
+    <ProjectReference Include="..\TightWiki.Web.Engine\TightWiki.Web.Engine.csproj" />
+    <ProjectReference Include="..\TightWiki.Localisation\TightWiki.Localisation.csproj" />
+  </ItemGroup>
+
+</Project>

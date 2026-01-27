@@ -1,0 +1,19 @@
+using TightWiki.Contracts.DataModels;
+using TightWiki.Localisation;
+using TightWiki.Web.Bff.ViewModels.Shared;
+
+namespace TightWiki.Web.Bff.ViewModels.AdminSecurity
+{
+    public class AccountProfileViewModel : ViewModelBase
+    {
+        public List<Theme> Themes { get; set; } = new();
+        public List<TimeZoneItem> TimeZones { get; set; } = new();
+        public List<CountryItem> Countries { get; set; } = new();
+        public List<LanguageItem> Languages { get; set; } = new();
+        public List<Role> Roles { get; set; } = new();
+        public AccountProfileAccountViewModel AccountProfile { get; set; } = new();
+        public CredentialViewModel Credential { get; set; } = new();
+        public string DefaultRole { get; set; } = string.Empty;
+    }
+}
+

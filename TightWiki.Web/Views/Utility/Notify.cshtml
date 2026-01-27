@@ -1,0 +1,126 @@
+﻿@inject IViewLocalizer Localizer
+@model TightWiki.Web.Bff.ViewModels.Utility.NotifyViewModel
+@{
+    Layout = "_Layout";
+    bool _isFirst = true;
+}
+
+@if (string.IsNullOrEmpty(@Model.RedirectURL) == false
+   && string.IsNullOrEmpty(Model.NotifyErrorMessage) == true
+   && string.IsNullOrEmpty(Model.NotifyWarningMessage) == true
+   && Model.RedirectTimeout > 0)
+{
+    <script>
+        document.addEventListener("DOMContentLoaded", function () {
+            var countdownElement = document.getElementById('countdown');
+            var countdownTime = @(Model.RedirectTimeout - 1);
+
+            var interval = setInterval(function () {
+                countdownElement.textContent = countdownTime;
+                countdownTime--;
+
+                if (countdownTime < 0) {
+                    clearInterval(interval);
+                    window.location.href = "@Model.RedirectURL";
+                }
+            }, 1000);
+        });
+    </script>
+}
+
+@if (!string.IsNullOrEmpty(Model.NotifyErrorMessage))
+{
+    <div class="alert alert-danger">
+        @{
+            var errorMessages = @Model.NotifyErrorMessage.Replace("\r\n", "\n").Split("\n");
+        }
+        @foreach (var message in errorMessages)
+        {
+            if (_isFirst)
+            {
+                <strong>@message</strong>
+                if (errorMessages.Count() > 1)
+                {
+                    <br />
+                    <hr />
+                }
+                _isFirst = false;
+            }
+            else
+            {
+                @message
+                <br />
+            }
+        }
+        @if (string.IsNullOrEmpty(@Model.RedirectURL) == false)
+        {
+            <br />
+            <a href="@Model.RedirectURL">@Localizer["Continue"]</a>
+        }
+    </div>
+}
+@if (!string.IsNullOrEmpty(Model.NotifyWarningMessage))
+{
+    <div class="alert alert-danger">
+        @{
+            var errorMessages = @Model.NotifyWarningMessage.Replace("\r\n", "\n").Split("\n");
+        }
+        @foreach (var message in errorMessages)
+        {
+            if (_isFirst)
+            {
+                <strong>@message</strong>
+                if (errorMessages.Count() > 1)
+                {
+                    <br />
+                    <hr />
+                }
+                _isFirst = false;
+            }
+            else
+            {
+                @message
+                <br />
+            }
+        }
+        @if (string.IsNullOrEmpty(@Model.RedirectURL) == false)
+        {
+            <br />
+            <a href="@Model.RedirectURL">@Localizer["Continue"]</a>
+        }
+    </div>
+}
+@if (!string.IsNullOrEmpty(Model.NotifySuccessMessage))
+{
+    <div class="alert alert-success">
+        @{
+            var successMessages = @Model.NotifySuccessMessage.Replace("\r\n", "\n").Split("\n");
+        }
+        @foreach (var message in successMessages)
+        {
+            if (_isFirst)
+            {
+                <strong>@message</strong>
+                if (successMessages.Count() > 1)
+                {
+                    <br />
+                    <hr />
+                }
+                _isFirst = false;
+            }
+            else
+            {
+                @message
+                <br />
+            }
+        }
+
+        @if (string.IsNullOrEmpty(@Model.RedirectURL) == false && Model.RedirectTimeout > 0)
+        {
+            <p>
+                @Localizer.Format("{0}Continue now{1} or you will be redirected in {2} seconds.",
+                    $"<a href=\"{Model.RedirectURL}\">", "</a>", $"<span id=\"countdown\">{Model.RedirectTimeout}</span>")
+            </p>
+        }
+    </div>
+}

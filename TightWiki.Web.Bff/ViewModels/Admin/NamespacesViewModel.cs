@@ -1,0 +1,10 @@
+using TightWiki.Contracts.DataModels;
+
+namespace TightWiki.Web.Bff.ViewModels.Admin
+{
+    public class NamespacesViewModel : ViewModelBase
+    {
+        public List<NamespaceStat> Namespaces { get; set; } = new();
+        public int PaginationPageCount { get; set; }
+    }
+}

@@ -1,0 +1,48 @@
+ 
+@inject IViewLocalizer Localizer
+@model TightWiki.Web.Bff.ViewModels.File.PageFileRevisionsViewModel
+@{
+    Layout = "_Layout";
+    var sessionState = ViewData["SessionState"] as TightWiki.SessionState ?? throw new Exception("Wiki State Context cannot be null.");
+}
+
+<h3>
+    @Localizer["Page File Revisions"]
+</h3>
+
+<p>
+    @Localizer["All changes that have been made to the attached file."]
+</p>
+
+@using (Html.BeginForm(FormMethod.Get))
+{
+    @Html.AntiForgeryToken()
+
+    @PageSelectorGenerator.Generate(Context.Request.QueryString, Model.PaginationPageCount)
+    <br />
+
+    <table class="table fixedTable100 table-striped" border="0" cellspacing="0" cellpadding="0">
+        <thead>
+            <tr>
+                <td><strong>@Localizer["Revision"]</strong></td>
+                <td><strong>@Localizer["Modified By"]</strong></td>
+                <td><strong>@Localizer["Modified Date"]</strong></td>
+                <td><strong>@Localizer["Summary"]</strong></td>
+            </tr>
+        </thead>
+
+        <tbody>
+            @foreach (var h in Model.Revisions)
+            {
+                <tr>
+                    <td><a href="@GlobalConfiguration.BasePath/File/Binary/@Model.PageNavigation/@Model.FileNavigation/@h.FileRevision" target="_blank" rel="noopener">@Html.DisplayTextFor(x => h.FileRevision)</a></td>
+                    <td><a href="@GlobalConfiguration.BasePath/Profile/@h.CreatedByUserName/Public">@Html.DisplayTextFor(x => h.CreatedByUserName)</a></td>
+                    <td>@Html.DisplayTextFor(x => h.CreatedDate)</td>
+                    <td>@Html.DisplayTextFor(x => h.FriendlySize)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+
+    @PageSelectorGenerator.Generate(Context.Request.QueryString, Model.PaginationPageCount)
+}

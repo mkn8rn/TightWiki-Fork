@@ -1,4 +1,4 @@
-﻿using Dapper;
+using Dapper;
 using Microsoft.Data.SqlClient;
 using Microsoft.Data.Sqlite;
 
