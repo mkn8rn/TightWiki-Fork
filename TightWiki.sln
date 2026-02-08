@@ -35,7 +35,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Browser", "Browser", "{5729
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TightWiki.Application", "TightWiki.Application\TightWiki.Application.csproj", "{5875EBB1-01BE-2D17-3613-D0BAD09CBB40}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TightWiki.Api", "TightWiki.API\TightWiki.Api.csproj", "{6E30CA9C-96DA-4365-8527-C2700D006B6E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TightWiki.PublicAPI", "TightWiki.PublicAPI\TightWiki.PublicAPI.csproj", "{6E30CA9C-96DA-4365-8527-C2700D006B6E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "PublicApi", "PublicApi", "{7F23AF5F-04D4-4A6E-810C-4D68B51D64EA}"
 EndProject

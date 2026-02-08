@@ -7,9 +7,8 @@ public sealed class IdentityDbContextFactory : IDesignTimeDbContextFactory<Ident
 {
     public IdentityDbContext CreateDbContext(string[] args)
     {
-        const string postgresConnectionString = "Host=localhost;Port=5432;Database=tightwiki_db;Username=postgres;Password=123456";
         var optionsBuilder = new DbContextOptionsBuilder<IdentityDbContext>();
-        optionsBuilder.UseNpgsql(postgresConnectionString);
+        optionsBuilder.UseNpgsql(InfrastructureServiceRegistration.ConnectionString);
         return new IdentityDbContext(optionsBuilder.Options);
     }
 }

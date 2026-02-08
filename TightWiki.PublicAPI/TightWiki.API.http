@@ -1,0 +1,11 @@
+@TightWiki.API_HostAddress = http://localhost:5138
+
+GET {{TightWiki.API_HostAddress}}/api/statistics
+Accept: application/json
+
+###
+
+GET {{TightWiki.API_HostAddress}}/api/pages?pageNumber=1
+Accept: application/json
+
+###

@@ -48,21 +48,7 @@ namespace TightWiki
 
             var builder = WebApplication.CreateBuilder(args);
 
-            const string postgresConnectionString = "Host=localhost;Port=5432;Database=tightwiki_db;Username=postgres;Password=123456";
-
-            builder.Services.AddDbContext<IdentityDbContext>(options =>
-                options.UseNpgsql(postgresConnectionString, o =>
-                    o.MigrationsAssembly("DAL")
-                     .MigrationsHistoryTable("__EFMigrationsHistory_Identity")));
-
-
-
-
-
-            builder.Services.AddDbContext<WikiDbContext>(options =>
-                options.UseNpgsql(postgresConnectionString, o =>
-                    o.MigrationsAssembly("DAL")
-                     .MigrationsHistoryTable("__EFMigrationsHistory_Wiki")));
+            builder.Services.AddTightWikiDbContexts();
 
             // Register BLL Services
             builder.Services.AddScoped<IConfigurationService, ConfigurationService>();

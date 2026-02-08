@@ -1,0 +1,21 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+	<PropertyGroup>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+	</PropertyGroup>
+
+	<ItemGroup>
+		<PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+		<PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" />
+		<PackageReference Include="Swashbuckle.AspNetCore.SwaggerUI" />
+	</ItemGroup>
+
+	<ItemGroup>
+		<ProjectReference Include="..\TightWiki.Application\TightWiki.Application.csproj" />
+		<ProjectReference Include="..\TightWiki.Contracts\TightWiki.Contracts.csproj" />
+		<ProjectReference Include="..\TightWiki.Infrastructure\TightWiki.Infrastructure.csproj" />
+	</ItemGroup>
+
+</Project>

@@ -7,9 +7,8 @@ public sealed class WikiDbContextFactory : IDesignTimeDbContextFactory<WikiDbCon
 {
     public WikiDbContext CreateDbContext(string[] args)
     {
-        const string postgresConnectionString = "Host=localhost;Port=5432;Database=tightwiki_db;Username=postgres;Password=123456";
         var optionsBuilder = new DbContextOptionsBuilder<WikiDbContext>();
-        optionsBuilder.UseNpgsql(postgresConnectionString);
+        optionsBuilder.UseNpgsql(InfrastructureServiceRegistration.ConnectionString);
         return new WikiDbContext(optionsBuilder.Options);
     }
 }
