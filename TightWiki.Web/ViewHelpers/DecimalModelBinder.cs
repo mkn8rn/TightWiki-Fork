@@ -4,7 +4,7 @@ using Microsoft.Extensions.Logging;
 using NTDLS.Helpers;
 using System.Globalization;
 
-namespace TightWiki.Helpers
+namespace TightWiki.ViewHelpers
 {
     public class InvariantDecimalModelBinderProvider : IModelBinderProvider
     {

@@ -1,8 +1,7 @@
-﻿@page
+@page
 @model ErrorModel
 @{
     ViewData["Title"] = "Error";
-    var sessionState = ViewData["SessionState"] as TightWiki.SessionState ?? throw new Exception("Wiki State Context cannot be null.");
 }
 
 <h1 class="text-danger">Error.</h1>

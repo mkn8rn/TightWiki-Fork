@@ -20,7 +20,7 @@ using TightWiki.Web.Engine;
 using TightWiki.Web.Engine.Handlers;
 using TightWiki.Web.Engine.Library.Interfaces;
 using DAL;
-using TightWiki.Helpers;
+using TightWiki.ViewHelpers;
 using TightWiki.Localisation;
 using TightWiki.Static;
 using TightWiki.Utils;
@@ -36,6 +36,9 @@ using BLL.Services.Seeding;
 using BLL.Services.Spanned;
 using BLL.Services.Statistics;
 using BLL.Services.Users;
+using TightWiki.Web.Bff;
+using TightWiki.Web.Bff.Services;
+using TightWiki.Web.Middleware;
 
 
 namespace TightWiki
@@ -66,21 +69,6 @@ namespace TightWiki
             // Register IEngineDataProvider (bridge between BLL services and Engine layer)
             builder.Services.AddScoped<IEngineDataProvider, EngineDataProvider>();
 
-            // SQLite specific initialization. Disabled until repositories are migrated to Postgres.
-
-
-            // ManagedDataStorage.Pages.SetConnectionString(builder.Configuration.GetConnectionString("PagesConnection"));
-            // ManagedDataStorage.DeletedPages.SetConnectionString(builder.Configuration.GetConnectionString("DeletedPagesConnection"));
-            // ManagedDataStorage.DeletedPageRevisions.SetConnectionString(builder.Configuration.GetConnectionString("DeletedPageRevisionsConnection"));
-            // ManagedDataStorage.Statistics.SetConnectionString(builder.Configuration.GetConnectionString("StatisticsConnection"));
-            // ManagedDataStorage.Emoji.SetConnectionString(builder.Configuration.GetConnectionString("EmojiConnection"));
-            // ManagedDataStorage.Exceptions.SetConnectionString(builder.Configuration.GetConnectionString("ExceptionsConnection"));
-            // ManagedDataStorage.Users.SetConnectionString(builder.Configuration.GetConnectionString("UsersConnection"));
-            // ManagedDataStorage.Config.SetConnectionString(builder.Configuration.GetConnectionString("ConfigConnection"));
-            //
-            // DatabaseUpgrade.UpgradeDatabase();
-            // ConfigurationRepository.ReloadEverything();
-
             // Add DiffPlex services.
             builder.Services.AddScoped<IDiffer, Differ>();
             builder.Services.AddScoped<ISideBySideDiffBuilder>(sp =>
@@ -92,6 +80,13 @@ namespace TightWiki
             builder.Services.AddDatabaseDeveloperPageExceptionFilter();
 
             builder.Services.AddLocalization(opts => { opts.ResourcesPath = "Resources"; });
+
+            // Wiki session — scoped service providing per-request identity, permissions, and page context.
+            builder.Services.AddHttpContextAccessor();
+            builder.Services.AddScoped<ISessionState, WikiSessionService>();
+
+            // Register BFF orchestration services
+            builder.Services.AddWebBffServices();
 
             // Adds support for controllers and views
             builder.Services.AddControllersWithViews(config =>

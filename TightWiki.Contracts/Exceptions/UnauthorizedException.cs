@@ -1,4 +1,4 @@
-namespace TightWiki.Exceptions
+namespace TightWiki.Contracts.Exceptions
 {
     public class UnauthorizedException : Exception
     {

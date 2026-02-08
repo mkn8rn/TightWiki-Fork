@@ -1,18 +1,12 @@
-using BLL.Services.Configuration;
-using BLL.Services.Pages;
-using BLL.Services.Users;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.Filters;
 using Microsoft.AspNetCore.Mvc.RazorPages;
- 
-using TightWiki.Contracts;
+using TightWiki.ViewHelpers;
 
 namespace TightWiki
 {
     public class PageModelBase : PageModel
     {
-        public SessionState SessionState { get; private set; } = new();
         public SignInManager<IdentityUser> SignInManager { get; private set; }
 
         public string SuccessMessage { get; set; } = string.Empty;
@@ -23,22 +17,6 @@ namespace TightWiki
         {
             SignInManager = signInManager;
         }
-
-        public override void OnPageHandlerExecuting(PageHandlerExecutingContext context)
-        {
-            // Resolve services from the request's service provider
-            var usersService = context.HttpContext.RequestServices.GetRequiredService<IUsersService>();
-            var configurationService = context.HttpContext.RequestServices.GetRequiredService<IConfigurationService>();
-            var pageService = context.HttpContext.RequestServices.GetRequiredService<IPageService>();
-
-            ViewData["SessionState"] = SessionState.Hydrate(SignInManager, this, usersService, configurationService, pageService);
-        }
-
-        /*
-        [NonAction]
-        public override RedirectResult Redirect(string? url)
-            => base.Redirect(url.EnsureNotNull());
-        */
 
         [NonAction]
         protected string? GetQueryString(string key)
@@ -65,22 +43,22 @@ namespace TightWiki
             => int.Parse(GetFormString(key, defaultValue.ToString()));
 
         protected RedirectResult NotifyOfSuccess(string message, string redirectUrl)
-            => Redirect($"{GlobalConfiguration.BasePath}/Utility/Notify?NotifySuccessMessage={Uri.EscapeDataString(message)}&RedirectUrl={Uri.EscapeDataString($"{GlobalConfiguration.BasePath}{redirectUrl}")}&RedirectTimeout=5");
+            => NotifyHelper.NotifyOfSuccess(message, redirectUrl);
 
         protected RedirectResult NotifyOfWarning(string message, string redirectUrl)
-            => Redirect($"{GlobalConfiguration.BasePath}/Utility/Notify?NotifyWarningMessage={Uri.EscapeDataString(message)}&RedirectUrl={Uri.EscapeDataString(Uri.EscapeDataString($"{GlobalConfiguration.BasePath}{redirectUrl}"))}");
+            => NotifyHelper.NotifyOfWarning(message, redirectUrl);
 
         protected RedirectResult NotifyOfError(string message, string redirectUrl)
-            => Redirect($"{GlobalConfiguration.BasePath}/Utility/Notify?NotifyErrorMessage={Uri.EscapeDataString(message)}&RedirectUrl={Uri.EscapeDataString(Uri.EscapeDataString($"{GlobalConfiguration.BasePath}{redirectUrl}"))}");
+            => NotifyHelper.NotifyOfError(message, redirectUrl);
 
         protected RedirectResult NotifyOfSuccess(string message)
-            => Redirect($"{GlobalConfiguration.BasePath}/Utility/Notify?NotifySuccessMessage={Uri.EscapeDataString(message)}");
+            => NotifyHelper.NotifyOfSuccess(message);
 
         protected RedirectResult NotifyOfWarning(string message)
-            => Redirect($"{GlobalConfiguration.BasePath}/Utility/Notify?NotifyWarningMessage={Uri.EscapeDataString(message)}");
+            => NotifyHelper.NotifyOfWarning(message);
 
         protected RedirectResult NotifyOfError(string message)
-            => Redirect($"{GlobalConfiguration.BasePath}/Utility/Notify?NotifyErrorMessage={Uri.EscapeDataString(message)}");
+            => NotifyHelper.NotifyOfError(message);
     }
 }
 

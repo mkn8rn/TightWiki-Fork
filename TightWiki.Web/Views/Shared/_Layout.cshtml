@@ -7,7 +7,8 @@
 @inject IViewLocalizer Localizer
 @inject IUsersService UsersService
 @{
-    var sessionState = ViewData["SessionState"] as SessionState ?? throw new Exception("Wiki State Context cannot be null.");
+    sessionState.EnsureInitialized();
+
     string navBarClass = $"navbar navbar-expand-sm navbar-toggleable-sm {(TightWiki.Contracts.GlobalConfiguration.FixedMenuPosition ? "fixed-top" : "")} navbar-light bg-white border-bottom box-shadow mb-3";
 
     var isPageProtected = sessionState.PageInstructions.Contains(WikiInstruction.Protect);
@@ -26,21 +27,21 @@
     <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32.png">
     <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16.png">
 
-    @if (string.IsNullOrWhiteSpace(TightWiki.Contracts.GlobalConfiguration.HTMLHeader) == false)
+    @if (string.IsNullOrWhiteSpace(GlobalConfiguration.HTMLHeader) == false)
     {
         <!-- HTMLHeader:Begin -->
-        @Html.Raw(TightWiki.Contracts.GlobalConfiguration.HTMLHeader)
+        @Html.Raw(GlobalConfiguration.HTMLHeader)
         <!-- HTMLHeader:Begin -->
     }
 
-    @if (TightWiki.Contracts.GlobalConfiguration.IncludeWikiDescriptionInMeta)
+    @if (GlobalConfiguration.IncludeWikiDescriptionInMeta)
     {
         <!-- PageDescription:Begin -->
         <meta name="description" content="@sessionState.Page.Description">
         <!-- PageDescription:Begin -->
     }
 
-    @if (TightWiki.Contracts.GlobalConfiguration.IncludeWikiTagsInMeta)
+    @if (GlobalConfiguration.IncludeWikiTagsInMeta)
     {
         <!-- PageTags:Begin -->
         <meta name="keywords" content="@sessionState.PageTags">

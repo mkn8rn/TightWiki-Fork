@@ -1,7 +1,8 @@
 @using Microsoft.AspNetCore.Mvc.Localization
 @using TightWiki.Contracts
-@using TightWiki.Extensions
-@using TightWiki.Helpers
+@using TightWiki.Contracts.Interfaces
+@using TightWiki.Web.Bff.Extensions
+@using TightWiki.ViewHelpers
 @using TightWiki.Localisation
 @using TightWiki.Utils
 @using TightWiki.Web.Bff.ViewModels
@@ -9,3 +10,4 @@
 @using TightWiki.Web.Bff.ViewModels.File
 @using TightWiki.Web.Bff.ViewModels.Shared
 @using TightWiki.Web.Bff.ViewModels.Utility
+@inject ISessionState sessionState

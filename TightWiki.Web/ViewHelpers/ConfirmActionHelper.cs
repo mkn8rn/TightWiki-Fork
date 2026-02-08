@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Html;
 using NTDLS.Helpers;
 using System.Text;
 
-namespace TightWiki.Helpers
+namespace TightWiki.ViewHelpers
 {
     public static class ConfirmActionHelper
     {

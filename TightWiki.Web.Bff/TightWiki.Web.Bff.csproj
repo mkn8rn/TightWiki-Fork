@@ -7,8 +7,10 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
     <PackageReference Include="DiffPlex" />
     <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" />
+    <PackageReference Include="NTDLS.DelegateThreadPooling" />
   </ItemGroup>
 
   <ItemGroup>
@@ -16,6 +18,7 @@
     <ProjectReference Include="..\TightWiki.Application\TightWiki.Application.csproj" />
     <ProjectReference Include="..\TightWiki.Web.Engine\TightWiki.Web.Engine.csproj" />
     <ProjectReference Include="..\TightWiki.Localisation\TightWiki.Localisation.csproj" />
+    <ProjectReference Include="..\TightWiki.Utils\TightWiki.Utils.csproj" />
   </ItemGroup>
 
 </Project>

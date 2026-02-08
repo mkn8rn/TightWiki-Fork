@@ -1,52 +1,44 @@
 using Microsoft.AspNetCore.Http;
+using TightWiki.Contracts.DataModels;
 using static TightWiki.Contracts.Constants;
 
 namespace TightWiki.Contracts.Interfaces
 {
     public interface ISessionState
     {
-        public IAccountProfile? Profile { get; set; }
+        // Identity
+        bool IsAuthenticated { get; }
+        bool IsAdministrator { get; }
+        IAccountProfile? Profile { get; set; }
+        Theme UserTheme { get; set; }
+        List<ApparentPermission> Permissions { get; }
+
+        // Current page context
+        IPage Page { get; set; }
+        string? PageTitle { get; set; }
+        bool ShouldCreatePage { get; set; }
+        string PageNavigation { get; set; }
+        string PageNavigationEscaped { get; set; }
+        string PageTags { get; set; }
+        ProcessingInstructionCollection PageInstructions { get; set; }
 
         IQueryCollection? QueryString { get; set; }
 
-        /// <summary>
-        /// Returns true if the user holds any of the the given permissions for the current page.
-        /// This is only applicable after SetPageId() has been called, to this is intended to be used in views NOT controllers.
-        /// </summary>
-        public bool HoldsPermission(WikiPermission[] permissions);
+        void EnsureInitialized();
+        void SetPageId(int? pageId, int? revision = null);
 
-        /// <summary>
-        /// Returns true if the user holds the given permission for the current page.
-        /// This is only applicable after SetPageId() has been called, to this is intended to be used in views NOT controllers.
-        /// </summary>
-        public bool HoldsPermission(WikiPermission permission);
+        // Permissions
+        bool HoldsPermission(WikiPermission[] permissions);
+        bool HoldsPermission(WikiPermission permission);
+        bool HoldsPermission(string? givenCanonical, WikiPermission permission);
+        bool HoldsPermission(string? givenCanonical, WikiPermission[] permissions);
+        void RequirePermission(string? givenCanonical, WikiPermission permission);
+        void RequirePermission(string? givenCanonical, WikiPermission[] permissions);
+        void RequireAdminPermission();
+        void RequireAuthorizedPermission();
 
-        /// <summary>
-        /// Returns true if the user holds the given permission for given page.
-        /// </summary>
-        public bool HoldsPermission(string? givenCanonical, WikiPermission permission);
-
-        /// <summary>
-        /// Returns true if the user holds any of the given permission for given page.
-        /// </summary>
-        public bool HoldsPermission(string? givenCanonical, WikiPermission[] permissions);
-
-        /// <summary>
-        /// Throws an exception if the user does not hold the given permission for given page.
-        /// </summary>
-        public void RequirePermission(string? givenCanonical, WikiPermission permission);
-
-        /// <summary>
-        /// Throws an exception if the user does not hold any of the given permission for given page.
-        /// </summary>
-        public void RequirePermission(string? givenCanonical, WikiPermission[] permissions);
-
-        /// <summary>
-        /// Throws an exception if the user is not an administrator.
-        /// </summary>
-        public void RequireAdminPermission();
-
-        public DateTime LocalizeDateTime(DateTime datetime);
-        public TimeZoneInfo GetPreferredTimeZone();
+        // Localization
+        DateTime LocalizeDateTime(DateTime datetime);
+        TimeZoneInfo GetPreferredTimeZone();
     }
 }

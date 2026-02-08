@@ -1,9 +1,8 @@
-﻿ 
+ 
 @inject IViewLocalizer Localizer
 @model TightWiki.Web.Bff.ViewModels.Page.PageRevertViewModel
 @{
     Layout = "_Layout";
-    var sessionState = ViewData["SessionState"] as TightWiki.SessionState ?? throw new Exception("Wiki State Context cannot be null.");
 }
 
 <div class="card shadow-lg border-warning mb-3">

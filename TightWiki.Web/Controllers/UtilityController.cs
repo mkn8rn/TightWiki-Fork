@@ -1,57 +1,31 @@
 using Microsoft.AspNetCore.Authorization;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
-using Microsoft.Extensions.Localization;
-using NTDLS.Helpers;
 using TightWiki.Web.Bff.ViewModels.Utility;
+using TightWiki.Web.Filters;
 
 namespace TightWiki.Controllers
 {
     [Authorize]
     [Route("[controller]")]
-    public class UtilityController(
-        SignInManager<IdentityUser> signInManager,
-        UserManager<IdentityUser> userManager,
-        IStringLocalizer<UtilityController> localizer)
-        : WikiControllerBase<UtilityController>(signInManager, userManager, localizer)
+    public class UtilityController : Controller
     {
         [AllowAnonymous]
+        [ProducesView]
         [HttpGet("Notify")]
-        public ActionResult Notify()
-        {
-            var model = new NotifyViewModel()
-            {
-                NotifySuccessMessage = GetQueryValue("NotifySuccessMessage", string.Empty),
-                NotifyErrorMessage = GetQueryValue("NotifyErrorMessage", string.Empty),
-                NotifyWarningMessage = GetQueryValue("NotifyWarningMessage", string.Empty),
-                RedirectURL = GetQueryValue("RedirectURL", string.Empty),
-                RedirectTimeout = GetQueryValue("RedirectTimeout", 0)
-            };
-
-            return View(model);
-        }
+        public NotifyViewModel Notify(NotifyViewModel model)
+            => model;
 
         [AllowAnonymous]
-        [HttpPost("ConfirmAction")]
-        public ActionResult ConfirmAction(ConfirmActionViewModel model)
-        {
-            return View(model);
-        }
-
-        [AllowAnonymous]
+        [ProducesView]
         [HttpGet("ConfirmAction")]
-        public ActionResult ConfirmAction()
-        {
-            var model = new ConfirmActionViewModel
-            {
-                ControllerURL = GetQueryValue<string>("controllerURL").EnsureNotNull(),
-                YesRedirectURL = GetQueryValue<string>("yesRedirectURL").EnsureNotNull(),
-                NoRedirectURL = GetQueryValue<string>("noRedirectURL").EnsureNotNull(),
-                Message = GetQueryValue<string>("message").EnsureNotNull(),
-                Style = GetQueryValue<string>("Style").EnsureNotNull()
-            };
+        public ConfirmActionViewModel ConfirmAction(ConfirmActionViewModel model)
+            => model;
 
-            return View(model);
-        }
+        [AllowAnonymous]
+        [ProducesView]
+        [HttpPost("ConfirmAction")]
+        [ActionName("ConfirmAction")]
+        public ConfirmActionViewModel ConfirmActionPost(ConfirmActionViewModel model)
+            => model;
     }
 }

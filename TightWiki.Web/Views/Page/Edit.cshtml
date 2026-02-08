@@ -1,10 +1,9 @@
-﻿ 
+ 
 @using static TightWiki.Contracts.Constants
 @inject IViewLocalizer Localizer
 @model TightWiki.Web.Bff.ViewModels.Page.PageEditViewModel
 @{
     Layout = "_Layout";
-    var sessionState = ViewData["SessionState"] as TightWiki.SessionState ?? throw new Exception("Wiki State Context cannot be null.");
 }
 
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/6.65.7/codemirror.min.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
@@ -777,7 +776,7 @@
                 @* Search *@
                 <div class="p-3 border-bottom position-sticky top-0" style="z-index:1">
                     <div class="input-group input-group-sm">
-                        <span class="input-group-text" id="featureInsertSearchLabel">🔎</span>
+                        <span class="input-group-text" id="featureInsertSearchLabel">??</span>
                         <input id="featureInsertModalSearch" type="text" class="form-control" placeholder="@Localizer["Search"]..." aria-labelledby="featureInsertSearchLabel">
                     </div>
                 </div>

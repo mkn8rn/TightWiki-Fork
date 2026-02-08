@@ -2,7 +2,7 @@ using Microsoft.AspNetCore.Http;
 using SixLabors.ImageSharp;
 using SixLabors.ImageSharp.Processing;
 
-namespace TightWiki.Helpers
+namespace TightWiki.ViewHelpers
 {
     public static class WebUtility
     {

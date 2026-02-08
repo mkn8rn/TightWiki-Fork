@@ -4,7 +4,6 @@
 @model AccountRolesViewModel
 @{
     Layout = "_Layout";
-    var sessionState = ViewData["SessionState"] as TightWiki.SessionState ?? throw new Exception("Wiki State Context cannot be null.");
 }
 
 <h3>
@@ -127,7 +126,7 @@
 
         const result = await response.json();
             if (!result.success) {
-            alert(result.message || '@Localizer["Removal failed"]');
+            alert(result.errorMessage || '@Localizer["Removal failed"]');
             return;
         }
 
@@ -151,7 +150,7 @@
 
         const result = await response.json();
             if (!result.success) {
-            alert(result.message || '@Localizer["Removal failed"]');
+            alert(result.errorMessage || '@Localizer["Removal failed"]');
             return;
         }
 
@@ -392,11 +391,11 @@
 
         const result = await response.json();
             if (!result.success) {
-            alert(result.message || 'Save failed.');
+            alert(result.errorMessage || 'Save failed.');
             return;
         }
 
-        if(result.alreadyExists)
+        if(result.data.alreadyExists)
         {
             alert('@Localizer["The account already has the specified permission."]')
             return;
@@ -408,24 +407,24 @@
         newRow.innerHTML = `
             <td>
                 ${
-                    result.permission.permissionDisposition.toLowerCase() === "allow"
+                    result.data.permissionDisposition.toLowerCase() === "allow"
                         ? '<i class="bi bi-check2 text-success"></i>'
                         : '<i class="bi bi-ban text-danger"></i>'
                 }
-                ${result.permission.permissionDisposition}
+                ${result.data.permissionDisposition}
             </td>
-            <td>${result.permission.permission}</td>
+            <td>${result.data.permission}</td>
             <td>
                 ${
-                    result.permission.namespace
-                        ? `<span><span class="text-muted">Namespace:</span> ${result.permission.resourceName === "*" ? "ALL" : result.permission.resourceName}</span>`
-                        : result.permission.pageId
-                            ? `<span><span class="text-muted">Page:</span> ${result.permission.resourceName === "*" ? "ALL" : result.permission.resourceName}</span>`
+                    result.data.namespace
+                        ? `<span><span class="text-muted">Namespace:</span> ${result.data.resourceName === "*" ? "ALL" : result.data.resourceName}</span>`
+                        : result.data.pageId
+                            ? `<span><span class="text-muted">Page:</span> ${result.data.resourceName === "*" ? "ALL" : result.data.resourceName}</span>`
                             : ""
                 }
             </td>
             <td>
-                <a class="btn btn-warning btn-thin" onclick="removePermission(this, '${result.permission.id}')">
+                <a class="btn btn-warning btn-thin" onclick="removePermission(this, '${result.data.id}')">
                     @Localizer["Remove"]
                 </a>
             </td>
@@ -536,11 +535,11 @@
 
         const result = await response.json();
             if (!result.success) {
-            alert(result.message || 'Save failed.');
+            alert(result.errorMessage || 'Save failed.');
             return;
         }
 
-        if(result.alreadyExists)
+        if(result.data.alreadyExists)
         {
             alert('@Localizer["The account is already a member of the specified role."]')
             return;
@@ -550,8 +549,8 @@
         const newRow = document.createElement("tr");
 
         newRow.innerHTML = `
-            <td><a href="@GlobalConfiguration.BasePath/AdminSecurity/Role/${result.membership.name}">${result.membership.name}</a></td>
-            <td><a class="btn btn-warning btn-thin" onclick="removeMembership(this, '${result.membership.id}')">@Localizer["Remove"]</a></td>
+            <td><a href="@GlobalConfiguration.BasePath/AdminSecurity/Role/${result.data.name}">${result.data.name}</a></td>
+            <td><a class="btn btn-warning btn-thin" onclick="removeMembership(this, '${result.data.id}')">@Localizer["Remove"]</a></td>
         `;
 
         tableBody.appendChild(newRow);

@@ -1,11 +1,10 @@
-﻿@using Microsoft.AspNetCore.Html
+@using Microsoft.AspNetCore.Html
 @using DiffPlex.DiffBuilder.Model
  
 @inject IViewLocalizer Localizer
 @model TightWiki.Web.Bff.ViewModels.Page.PageCompareViewModel
 @{
     Layout = "_Layout";
-    var sessionState = ViewData["SessionState"] as TightWiki.SessionState ?? throw new Exception("Wiki State Context cannot be null.");
 }
 
 @if (@sessionState.UserTheme.EditorTheme == "dark")

@@ -11,5 +11,7 @@ namespace TightWiki.Contracts.DataModels
         /// Name of the role.
         /// </summary>
         public string Name { get; set; } = string.Empty;
+
+        public bool AlreadyExists { get; set; }
     }
 }

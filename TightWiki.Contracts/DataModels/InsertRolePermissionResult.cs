@@ -11,5 +11,6 @@ namespace TightWiki.Contracts.DataModels
         public string? ResourceName { get; set; }
         public string? Namespace { get; set; }
         public string? PageId { get; set; }
+        public bool AlreadyExists { get; set; }
     }
 }

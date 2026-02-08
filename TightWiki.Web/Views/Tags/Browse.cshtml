@@ -1,8 +1,7 @@
-﻿@inject IViewLocalizer Localizer
+@inject IViewLocalizer Localizer
 @model TightWiki.Web.Bff.ViewModels.Page.BrowseViewModel
 @{
     Layout = "_Layout";
-    var sessionState = ViewData["SessionState"] as TightWiki.SessionState ?? throw new Exception("Wiki State Context cannot be null.");
 }
 
 <div class="card shadow-lg">

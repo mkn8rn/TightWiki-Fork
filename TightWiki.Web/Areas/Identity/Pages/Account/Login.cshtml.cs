@@ -11,7 +11,7 @@ using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Localization;
 using System.ComponentModel.DataAnnotations;
 using System.Net;
-using TightWiki.Extensions;
+using TightWiki.Web.Bff.Extensions;
 using TightWiki.Utils;
  
 using TightWiki.Utils.Security;

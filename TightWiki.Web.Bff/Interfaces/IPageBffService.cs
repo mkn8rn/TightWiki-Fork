@@ -1,46 +1,48 @@
-using TightWiki.Contracts.DTOs;
-using TightWiki.Contracts.Requests;
-using TightWiki.Contracts.Responses;
+using Microsoft.AspNetCore.Mvc;
+using TightWiki.Web.Bff.ViewModels.Page;
 
 namespace TightWiki.Web.Bff.Interfaces
 {
-    /// <summary>
-    /// BFF service for page operations.
-    /// Orchestrates between Application (data) and Engine (rendering).
-    /// </summary>
     public interface IPageBffService
     {
-        /// <summary>
-        /// Gets a page with pre-rendered HTML for display.
-        /// Flow: Application ? Data ? BFF ? Engine ? Rendered HTML
-        /// </summary>
-        Task<PageRenderedDto?> GetPageRenderedAsync(string navigation, int? revision = null);
+        // Display
+        DisplayPageResult GetDisplayResult(PageDisplayRequest request);
 
-        /// <summary>
-        /// Gets a page for editing (raw markup, no rendering).
-        /// Flow: Application ? Data ? BFF ? DTO
-        /// </summary>
-        Task<PageEditDto?> GetPageForEditAsync(string navigation);
+        // Search
+        IActionResult AutoCompletePage(string? query);
+        PageSearchViewModel GetSearchViewModel(PageSearchRequest request);
 
-        /// <summary>
-        /// Saves a page.
-        /// Flow: BFF ? Application ? Database
-        /// </summary>
-        Task<ApiResponse<PageDto>> SavePageAsync(string navigation, SavePageRequest request, Guid userId);
+        // Localization
+        PageLocalizationViewModel GetLocalizationViewModel();
+        IActionResult SetLocalization(SetLocalizationRequest request);
 
-        /// <summary>
-        /// Deletes a page.
-        /// </summary>
-        Task<ApiResponse> DeletePageAsync(int pageId, Guid userId);
+        // Comments
+        PageCommentsViewModel GetCommentsViewModel(PageCommentsRequest request);
+        PageCommentsViewModel PostComment(PostCommentRequest request);
 
-        /// <summary>
-        /// Gets page revisions.
-        /// </summary>
-        Task<PaginatedResponse<PageDto>> GetPageRevisionsAsync(string navigation, int pageNumber, int pageSize);
+        // Refresh
+        IActionResult RefreshPage(string givenCanonical);
 
-        /// <summary>
-        /// Searches pages with rendered snippets.
-        /// </summary>
-        Task<PaginatedResponse<SearchResultDto>> SearchPagesAsync(SearchRequest request);
+        // Compare
+        PageCompareViewModel GetCompareViewModel(PageCompareRequest request);
+
+        // Revisions
+        RevisionsViewModel GetRevisionsViewModel(PageRevisionsRequest request);
+
+        // Delete
+        IActionResult DeletePage(PageDeleteRequest request);
+        PageDeleteViewModel GetDeleteViewModel(string givenCanonical);
+
+        // Revert
+        IActionResult RevertPage(PageRevertRequest request);
+        PageRevertViewModel GetRevertViewModel(string givenCanonical, int pageRevision);
+
+        // Edit
+        PageEditViewModel GetEditViewModel(string givenCanonical, string? pageName);
+        IActionResult SavePage(PageEditViewModel model);
+        IActionResult GetTemplateBody(int id);
+
+        // Export
+        IActionResult Export(PageExportRequest request);
     }
 }

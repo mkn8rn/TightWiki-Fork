@@ -2,237 +2,206 @@ using BLL.Services.Configuration;
 using BLL.Services.Pages;
 using BLL.Services.Users;
 using Microsoft.AspNetCore.Authentication;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
-using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.Routing;
 using NTDLS.Helpers;
 using System.Security.Claims;
 using TightWiki.Utils.Caching;
 using TightWiki.Contracts;
 using TightWiki.Contracts.DataModels;
+using TightWiki.Contracts.Exceptions;
 using TightWiki.Contracts.Interfaces;
-using TightWiki.Exceptions;
-using TightWiki.Extensions;
 using TightWiki.Static;
 using TightWiki.Utils;
+using TightWiki.Web.Bff.Extensions;
 using static TightWiki.Contracts.Constants;
 
-namespace TightWiki
+namespace TightWiki.Web.Bff.Services
 {
-    public class SessionState : ISessionState
+    /// <summary>
+    /// Scoped service that provides per-request wiki session state.
+    /// Self-initializes from the current HttpContext user on first access.
+    /// </summary>
+    public sealed class WikiSessionService : ISessionState
     {
+        private readonly IHttpContextAccessor _httpContextAccessor;
+        private readonly SignInManager<IdentityUser> _signInManager;
+        private readonly IUsersService _usersService;
+        private readonly IConfigurationService _configurationService;
+        private readonly IPageService _pageService;
+
         private readonly string _denyString = WikiPermissionDisposition.Deny.ToString();
         private readonly string _allowString = WikiPermissionDisposition.Allow.ToString();
 
-        // BLL Services - injected during Hydrate
-        private IUsersService? _usersService;
-        private IConfigurationService? _configurationService;
-        private IPageService? _pageService;
+        private bool _initialized;
 
-        public IQueryCollection? QueryString { get; set; }
+        public WikiSessionService(
+            IHttpContextAccessor httpContextAccessor,
+            SignInManager<IdentityUser> signInManager,
+            IUsersService usersService,
+            IConfigurationService configurationService,
+            IPageService pageService)
+        {
+            _httpContextAccessor = httpContextAccessor;
+            _signInManager = signInManager;
+            _usersService = usersService;
+            _configurationService = configurationService;
+            _pageService = pageService;
+        }
 
-        #region Authentication.
+        #region Identity
 
-        public bool IsAuthenticated { get; set; }
+        public bool IsAuthenticated { get; private set; }
+        public bool IsAdministrator { get; private set; }
         public IAccountProfile? Profile { get; set; }
-        public bool IsAdministrator { get; set; }
         public Theme UserTheme { get; set; } = new();
-        public List<ApparentPermission> Permissions { get; set; } = new();
+        public List<ApparentPermission> Permissions { get; private set; } = new();
 
         #endregion
 
-        #region Current Page.
+        #region Current page context
 
-        /// <summary>
-        /// Custom page title set by a call to @@Title("...")
-        /// </summary>
+        public IPage Page { get; set; } = new Page() { Name = GlobalConfiguration.Name };
         public string? PageTitle { get; set; }
         public bool ShouldCreatePage { get; set; }
         public string PageNavigation { get; set; } = string.Empty;
         public string PageNavigationEscaped { get; set; } = string.Empty;
         public string PageTags { get; set; } = string.Empty;
         public ProcessingInstructionCollection PageInstructions { get; set; } = new();
-
-        /// <summary>
-        /// The "page" here is more of a "mock page", we use the name for various stuff.
-        /// </summary>
-        public IPage Page { get; set; } = new TightWiki.Contracts.DataModels.Page() { Name = GlobalConfiguration.Name };
+        public IQueryCollection? QueryString { get; set; }
 
         #endregion
 
-        public SessionState Hydrate(SignInManager<IdentityUser> signInManager, PageModel pageModel,
-            IUsersService usersService, IConfigurationService configurationService, IPageService pageService)
+        /// <summary>
+        /// Ensures identity data has been loaded from the current HttpContext.
+        /// Called automatically by permission/localization methods, but can be
+        /// called explicitly for eager initialization.
+        /// </summary>
+        public void EnsureInitialized()
         {
-            _usersService = usersService;
-            _configurationService = configurationService;
-            _pageService = pageService;
+            if (_initialized) return;
+            _initialized = true;
 
-            QueryString = pageModel.Request.Query;
+            var httpContext = _httpContextAccessor.HttpContext
+                ?? throw new InvalidOperationException("WikiSessionService requires an active HttpContext.");
 
-            HydrateSecurityContext(pageModel.HttpContext, signInManager, pageModel.User);
-            return this;
-        }
+            QueryString = httpContext.Request.Query;
 
-        public SessionState Hydrate(SignInManager<IdentityUser> signInManager, Controller controller,
-            IUsersService usersService, IConfigurationService configurationService, IPageService pageService)
-        {
-            _usersService = usersService;
-            _configurationService = configurationService;
-            _pageService = pageService;
-
-            QueryString = controller.Request.Query;
-            PageNavigation = RouteValue("givenCanonical", "Home");
+            // Extract page navigation from route data
+            if (httpContext.GetRouteValue("givenCanonical") is string givenCanonical)
+            {
+                PageNavigation = givenCanonical;
+            }
+            else
+            {
+                PageNavigation = "Home";
+            }
             PageNavigationEscaped = Uri.EscapeDataString(PageNavigation);
 
-            HydrateSecurityContext(controller.HttpContext, signInManager, controller.User);
-
-            string RouteValue(string key, string defaultValue = "")
-            {
-                if (controller.RouteData.Values.ContainsKey(key))
-                {
-                    return controller.RouteData.Values[key]?.ToString() ?? defaultValue;
-                }
-                return defaultValue;
-            }
-
-            return this;
-        }
-
-        private void HydrateSecurityContext(HttpContext httpContext, SignInManager<IdentityUser> signInManager, ClaimsPrincipal user)
-        {
-            IsAuthenticated = false;
-
+            // Hydrate security context
             UserTheme = GlobalConfiguration.SystemTheme;
+            var user = httpContext.User;
 
-            if (signInManager.IsSignedIn(user))
+            if (_signInManager.IsSignedIn(user))
             {
                 try
                 {
-                    //string emailAddress = (user.Claims.First(x => x.Type == ClaimTypes.Email)?.Value).EnsureNotNull();
-
                     if (user.Identity?.IsAuthenticated == true)
                     {
                         var userId = Guid.Parse((user.Claims.First(x => x.Type == ClaimTypes.NameIdentifier)?.Value).EnsureNotNull());
 
-                        if (_usersService!.TryGetBasicProfileByUserId(userId, out var profile))
+                        if (_usersService.TryGetBasicProfileByUserId(userId, out var profile))
                         {
                             Profile = profile;
                             IsAdministrator = _usersService.IsUserMemberOfAdministrators(userId);
                             Permissions = _usersService.GetApparentAccountPermissions(userId).ToList();
-                            UserTheme = _configurationService!.GetAllThemes().SingleOrDefault(o => o.Name == Profile.Theme) ?? GlobalConfiguration.SystemTheme;
+                            UserTheme = _configurationService.GetAllThemes().SingleOrDefault(o => o.Name == Profile.Theme) ?? GlobalConfiguration.SystemTheme;
                             IsAuthenticated = true;
                             return;
                         }
-                        else
-                        {
-                            //User is signed in, but does not have a profile.
-                            //This likely means that the user has authenticated externally, but has yet to complete the signup process.
-                        }
                     }
                 }
-                catch (System.Exception ex)
+                catch (Exception ex)
                 {
                     httpContext.SignOutAsync();
                     if (user.Identity != null)
                     {
                         httpContext.SignOutAsync(user.Identity.AuthenticationType);
                     }
-
-                    // Note: Exception logging deferred - session state doesn't have DI access
-                    // TO-DO: Fix this later.
-                    System.Diagnostics.Debug.WriteLine($"SessionState hydration error: {ex.Message}");
+                    System.Diagnostics.Debug.WriteLine($"WikiSessionService hydration error: {ex.Message}");
                 }
             }
 
-            Permissions = _usersService!.GetApparentRolePermissions(WikiRoles.Anonymous.ToString()).ToList();
+            Permissions = _usersService.GetApparentRolePermissions(WikiRoles.Anonymous.ToString()).ToList();
         }
 
-        /// <summary>
-        /// Sets the current context pageId and optionally the revision.
-        /// </summary>
+        #region Page context
+
         public void SetPageId(int? pageId, int? revision = null)
         {
-            Page = new TightWiki.Contracts.DataModels.Page();
+            EnsureInitialized();
+
+            Page = new Page();
             PageInstructions = new();
             PageTags = string.Empty;
 
             if (pageId != null)
             {
-                Page = _pageService!.GetLimitedPageInfoByIdAndRevision((int)pageId, revision)
-                    ?? throw new System.Exception("Page not found");
+                Page = _pageService.GetLimitedPageInfoByIdAndRevision((int)pageId, revision)
+                    ?? throw new Exception("Page not found");
 
                 PageInstructions = _pageService.GetPageProcessingInstructionsByPageId(Page.Id);
 
                 if (GlobalConfiguration.IncludeWikiTagsInMeta)
                 {
-                    PageTags = string.Join(",", _pageService!.GetPageTagsById(Page.Id)?.Select(o => o.Tag) ?? []);
+                    PageTags = string.Join(",", _pageService.GetPageTagsById(Page.Id)?.Select(o => o.Tag) ?? []);
                 }
             }
         }
 
-        #region Permissions.
+        #endregion
 
-        /// <summary>
-        /// Returns true if the user holds any of the the given permissions for the current page.
-        /// This is only applicable after SetPageId() has been called, to this is intended to be used in views NOT controllers.
-        /// </summary>
+        #region Permissions
+
         public bool HoldsPermission(WikiPermission[] permissions)
             => HoldsPermission(Page.Navigation, permissions);
 
-        /// <summary>
-        /// Returns true if the user holds the given permission for the current page.
-        /// This is only applicable after SetPageId() has been called, to this is intended to be used in views NOT controllers.
-        /// </summary>
         public bool HoldsPermission(WikiPermission permission)
             => HoldsPermission(Page.Navigation, permission);
 
-        /// <summary>
-        /// Returns true if the user holds the given permission for given page.
-        /// </summary>
         public bool HoldsPermission(string? givenCanonical, WikiPermission permission)
             => HoldsPermission(givenCanonical, [permission]);
 
-        /// <summary>
-        /// Returns true if the user holds any of the given permission for given page.
-        /// </summary>
         public bool HoldsPermission(string? givenCanonical, WikiPermission[] permissions)
         {
-            if (IsAdministrator)
-            {
-                return true;
-            }
+            EnsureInitialized();
 
-            var cacheKey = WikiCacheKeyFunction.Build(WikiCache.Category.Security, [givenCanonical, Profile?.UserId, string.Join("|", permissions).ToLowerInvariant()]);
+            if (IsAdministrator) return true;
+
+            var cacheKey = WikiCacheKeyFunction.Build(WikiCache.Category.Security,
+                [givenCanonical, Profile?.UserId, string.Join("|", permissions).ToLowerInvariant()]);
 
             return WikiCache.AddOrGet(cacheKey, () =>
             {
-                TightWiki.Contracts.DataModels.Page? page = null;
+                Page? page = null;
 
                 if (givenCanonical != null)
                 {
                     var navigation = new NamespaceNavigation(givenCanonical);
-                    page = _pageService!.GetPageInfoByNavigation(navigation.Canonical);
+                    page = _pageService.GetPageInfoByNavigation(navigation.Canonical);
                 }
 
                 foreach (var permission in permissions)
                 {
-                    //Remember that we are evaluating to see if the user holds ANY one of the supplied permissions.
-                    //So, we are going to evaluate each permission in the supplied array individually,
-                    //  ignoring any NULL results (as NULL means that the permission was not explicitly allowed or denied).
-                    //If the permission is explicitly allowed, we return true.
-                    //If the permission is explicitly denied, we move to the next permission because permission could
-                    //  have been denied on a namespace but explicitly allowed on a page (and yes, we test in that order).
-                    //Also note that we do not pass the page when the permission is Create - because that would make no sense.
                     if (EvaluatePermission(permission, permission == WikiPermission.Create ? null : page) == true)
-                    {
                         return true;
-                    }
                 }
                 return false;
             }, WikiCache.DefaultCacheSeconds);
         }
 
-        private bool? EvaluatePermission(WikiPermission permission, TightWiki.Contracts.DataModels.Page? page)
+        private bool? EvaluatePermission(WikiPermission permission, Page? page)
         {
             string permissionString = permission.ToString();
 
@@ -240,130 +209,96 @@ namespace TightWiki
             {
                 var pageIdString = page.Id.ToString();
 
-                //Check to see the the user has been explicitly denied access to the current page.
                 if (Permissions.Any(o => o.PageId == pageIdString
                     && o.Permission.Equals(permissionString, StringComparison.InvariantCultureIgnoreCase)
                     && o.PermissionDisposition.Equals(_denyString, StringComparison.InvariantCultureIgnoreCase)))
-                {
                     return false;
-                }
-                //Check to see the the user has been explicitly granted access to the current page.
+
                 if (Permissions.Any(o => o.PageId == pageIdString
                     && o.Permission.Equals(permissionString, StringComparison.InvariantCultureIgnoreCase)
                     && o.PermissionDisposition.Equals(_allowString, StringComparison.InvariantCultureIgnoreCase)))
-                {
                     return true;
-                }
 
-                //Check to see the the user has been explicitly denied access to the current namespace.
                 if (Permissions.Any(o => o.Namespace?.Equals(page.Namespace, StringComparison.InvariantCultureIgnoreCase) == true
                     && o.Permission.Equals(permissionString, StringComparison.InvariantCultureIgnoreCase)
                     && o.PermissionDisposition.Equals(_denyString, StringComparison.InvariantCultureIgnoreCase)))
-                {
                     return false;
-                }
 
-                //Check to see the the user has been explicitly granted access to the current namespace.
                 if (Permissions.Any(o => o.Namespace?.Equals(page.Namespace, StringComparison.InvariantCultureIgnoreCase) == true
                     && o.Permission.Equals(permissionString, StringComparison.InvariantCultureIgnoreCase)
                     && o.PermissionDisposition.Equals(_allowString, StringComparison.InvariantCultureIgnoreCase)))
-                {
                     return true;
-                }
             }
 
-            //Check to see the the user has been explicitly denied access to all pages.
             if (Permissions.Any(o => o.PageId?.Equals("*", StringComparison.InvariantCultureIgnoreCase) == true
                 && o.Permission.Equals(permissionString, StringComparison.InvariantCultureIgnoreCase)
                 && o.PermissionDisposition.Equals(_denyString, StringComparison.InvariantCultureIgnoreCase)))
-            {
                 return false;
-            }
 
-            //Check to see the the user has been explicitly granted access to all pages.
             if (Permissions.Any(o => o.PageId?.Equals("*", StringComparison.InvariantCultureIgnoreCase) == true
                 && o.Permission.Equals(permissionString, StringComparison.InvariantCultureIgnoreCase)
                 && o.PermissionDisposition.Equals(_allowString, StringComparison.InvariantCultureIgnoreCase)))
-            {
                 return true;
-            }
 
-            //Check to see the the user has been explicitly denied access to all namespaces.
             if (Permissions.Any(o => o.Namespace?.Equals("*", StringComparison.InvariantCultureIgnoreCase) == true
                 && o.Permission.Equals(permissionString, StringComparison.InvariantCultureIgnoreCase)
                 && o.PermissionDisposition.Equals(_denyString, StringComparison.InvariantCultureIgnoreCase)))
-            {
                 return false;
-            }
 
-            //Check to see the the user has been explicitly granted access to all namespaces.
             if (Permissions.Any(o => o.Namespace?.Equals("*", StringComparison.InvariantCultureIgnoreCase) == true
                 && o.Permission.Equals(permissionString, StringComparison.InvariantCultureIgnoreCase)
                 && o.PermissionDisposition.Equals(_allowString, StringComparison.InvariantCultureIgnoreCase)))
-            {
                 return true;
-            }
 
             return null;
         }
 
         public void RequireAuthorizedPermission()
         {
+            EnsureInitialized();
             if (!IsAuthenticated)
-            {
                 throw new UnauthorizedException(StaticLocalizer.Localizer["You are not authorized"]);
-            }
         }
 
-        /// <summary>
-        /// Throws an exception if the user does not hold any of the given permission for given page.
-        /// </summary>
         public void RequirePermission(string? givenCanonical, WikiPermission[] permissions)
         {
+            EnsureInitialized();
             if (!HoldsPermission(givenCanonical, permissions))
-            {
                 throw new UnauthorizedException(StaticLocalizer.Localizer["You do not have permission to perform the action: {0}"]
                     .Format(string.Join(", ", permissions.Select(o => StaticLocalizer.Localizer[o.ToString()]))));
-            }
         }
 
-        /// <summary>
-        /// Throws an exception if the user does not hold the given permission for given page.
-        /// </summary>
         public void RequirePermission(string? givenCanonical, WikiPermission permission)
         {
+            EnsureInitialized();
             if (!HoldsPermission(givenCanonical, permission))
-            {
                 throw new UnauthorizedException(StaticLocalizer.Localizer["You do not have permission to perform the action: {0}"]
                     .Format(StaticLocalizer.Localizer[permission.ToString()]));
-            }
         }
 
-        /// <summary>
-        /// Throws an exception if the user is not an administrator.
-        /// </summary>
         public void RequireAdminPermission()
         {
+            EnsureInitialized();
             if (!IsAdministrator)
-            {
                 throw new UnauthorizedException(StaticLocalizer.Localizer["You do not have permission to perform the action: {0}"]
                     .Format(StaticLocalizer.Localizer["Administration"].Value));
-            }
         }
 
         #endregion
+
+        #region Localization
 
         public DateTime LocalizeDateTime(DateTime datetime)
             => TimeZoneInfo.ConvertTimeFromUtc(datetime, GetPreferredTimeZone());
 
         public TimeZoneInfo GetPreferredTimeZone()
         {
+            EnsureInitialized();
             if (string.IsNullOrEmpty(Profile?.TimeZone))
-            {
                 return TimeZoneInfo.FindSystemTimeZoneById(GlobalConfiguration.DefaultTimeZone);
-            }
             return TimeZoneInfo.FindSystemTimeZoneById(Profile.TimeZone);
         }
+
+        #endregion
     }
 }
-

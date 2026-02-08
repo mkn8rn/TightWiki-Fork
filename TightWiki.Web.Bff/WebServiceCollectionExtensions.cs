@@ -7,7 +7,7 @@ namespace TightWiki.Web.Bff
     /// <summary>
     /// Extension methods for registering BFF services in DI container.
     /// </summary>
-    public static class BffServiceCollectionExtensions
+    public static class WebServiceCollectionExtensions
     {
         /// <summary>
         /// Registers all Web BFF services.
@@ -17,8 +17,12 @@ namespace TightWiki.Web.Bff
         {
             // Register BFF orchestration services
             services.AddScoped<IPageBffService, PageBffService>();
-            // services.AddScoped<IUserBffService, UserBffService>();
-            // services.AddScoped<IFileBffService, FileBffService>();
+            services.AddScoped<IAdminBffService, AdminService>();
+            services.AddScoped<IAdminSecurityBffService, AdminSecurityService>();
+            services.AddScoped<IAccountBffService, AccountService>();
+            services.AddScoped<IProfileBffService, ProfileService>();
+            services.AddScoped<IFileBffService, FileService>();
+            services.AddScoped<ITagsBffService, TagsService>();
 
             return services;
         }
