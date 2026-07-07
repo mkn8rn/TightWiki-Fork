@@ -3,7 +3,7 @@
 This project is based on TightWiki (MIT). Original code remains MIT licensed; my modifications are AGPL-3.0.
 Link to the original: https://github.com/NTDLS/TightWiki
 
-Originally a spur of the moment thing, I'm currently this fork educationally for teaching software architecture concepts to a private community, notably traditional architecture and backend for frontend (BFF) patterns. This fork is not KISS compliant nor should you expect that given my goal. Futhermore, it is not considered production ready, nor should you expect that either.
+Originally a spur of the moment thing, I created this fork educationally for teaching software architecture concepts to a private community, notably traditional architecture and backend for frontend (BFF) patterns. This fork is not KISS compliant nor should you expect that given my goal. Futhermore, it is not considered production ready, nor should you expect that either.
 
 The current project structure makes sense when you are building a platform rather than an app: when you have multiple fundamentally different clients, non-trivial domain logic that must be centralized, and a need for clean, long-term separation between presentation concerns and core behavior. Does this project need all of these things? No. 
 
