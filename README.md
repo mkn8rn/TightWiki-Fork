@@ -8,8 +8,3 @@ Originally a spur of the moment thing, I'm currently this fork educationally for
 The current project structure makes sense when you are building a platform rather than an app: when you have multiple fundamentally different clients, non-trivial domain logic that must be centralized, and a need for clean, long-term separation between presentation concerns and core behavior. Does this project need all of these things? No. 
 
 A fork was more convenient than creating a whole project from scratch. A real full featured platform requires a full featured platform workload... 
-
-The community is on Matrix, and you, the reader, may join. Private rooms are for contributors or paying members; public rooms do not require involvement beyond being respectful and following the code of conduct, but are also largely inactive at this time.
-
-Public rooms space: https://matrix.to/#/#p1:matrix.mkn8rn.com
-Private rooms space: https://matrix.to/#/#s1:matrix.mkn8rn.com
